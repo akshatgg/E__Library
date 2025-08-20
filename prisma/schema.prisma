@@ -8,30 +8,47 @@ datasource db {
 }
 
 model User {
-  id          String        @id @default(cuid())
-  uid         String        @unique
-  email       String        @unique
-  displayName String?
-  role        String        @default("user")
-  credits     Int           @default(0)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  lastLogin   DateTime      @default(now()) @map("last_login")
+  id           String        @id @default(cuid())
+  uid          String        @unique
+  email        String        @unique
+  displayName  String?
+  role         String        @default("user")
+  credits      Int           @default(0)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  lastLogin    DateTime      @default(now()) @map("last_login")
+  otps         OTP[]
   transactions Transaction[]
 
   @@map("users")
 }
 
+model OTP {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  email     String
+  otp       String
+  type      String   @default("verification")
+  used      Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([email])
+  @@map("otps")
+}
+
 model Transaction {
-  id          String    @id @default(cuid())
-  userId      String    @map("user_id")
-  orderId     String    @map("order_id")
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  orderId     String   @map("order_id")
   amount      Int
   credits     Int
   description String
-  status      String    @default("pending")
-  type        String    @default("purchase")
-  timestamp   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String   @default("pending")
+  type        String   @default("purchase")
+  timestamp   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("transactions")
