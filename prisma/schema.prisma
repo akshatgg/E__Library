@@ -15,9 +15,8 @@ model User {
   role         String        @default("user")
   credits      Int           @default(0)
   createdAt    DateTime      @default(now()) @map("created_at")
-  lastLoggedin DateTime      @default(now()) @map("last_login")
+  lastLogin    DateTime      @default(now()) @map("last_login")
   isVerified   Boolean       @default(false) @map("is_verified")
-  isActive     Boolean       @default(false) @map("is_active")
   password     String
   otps         OTP[]
   transactions Transaction[]
