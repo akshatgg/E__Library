@@ -1,72 +1,72 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useAuthContext } from "@/components/auth-provider"
-import { useToast } from "@/hooks/use-toast"
+import {useState} from "react";
+import {useAuth} from "@/components/auth-provider";
+import {useToast} from "@/hooks/use-toast";
 
 declare global {
   interface Window {
-    Razorpay: any
+    Razorpay: any;
   }
 }
 
 interface PaymentOptions {
-  credits: number
-  amount: number
-  onSuccess?: (transaction: any) => Promise<void>
+  credits: number;
+  amount: number;
+  onSuccess?: (transaction: any) => Promise<void>;
 }
 
 interface Transaction {
-  id: string
-  orderId: string
-  type: string
-  credits: number
-  amount: number
-  status: "success" | "failed" | "pending"
-  timestamp: Date
-  description: string
+  id: string;
+  orderId: string;
+  type: string;
+  credits: number;
+  amount: number;
+  status: "success" | "failed" | "pending";
+  timestamp: Date;
+  description: string;
   error?: {
-    code: string
-    description: string
-  }
+    code: string;
+    description: string;
+  };
 }
 
 export function useRazorpay() {
-  const { user, refreshUserData, addCredits } = useAuthContext()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
+  const {user} = useAuth();
+  const {toast} = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
-      const script = document.createElement("script")
-      script.src = "https://checkout.razorpay.com/v1/checkout.js"
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.onload = () => {
-        resolve(true)
-      }
+        resolve(true);
+      };
       script.onerror = () => {
-        resolve(false)
-      }
-      document.body.appendChild(script)
-    })
-  }
+        resolve(false);
+      };
+      document.body.appendChild(script);
+    });
+  };
 
-  const makePayment = async ({ credits, amount, onSuccess }: PaymentOptions) => {
+  const makePayment = async ({credits, amount, onSuccess}: PaymentOptions) => {
     if (!user) {
       toast({
         title: "Error",
         description: "Please sign in to make a purchase",
         variant: "destructive",
-      })
-      return null
+      });
+      return null;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
       // Load Razorpay script
-      const scriptLoaded = await loadRazorpayScript()
+      const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
-        throw new Error("Failed to load Razorpay script")
+        throw new Error("Failed to load Razorpay script");
       }
 
       // Create order
@@ -79,13 +79,13 @@ export function useRazorpay() {
           amount,
           credits,
         }),
-      })
+      });
 
       if (!orderResponse.ok) {
-        throw new Error("Failed to create payment order")
+        throw new Error("Failed to create payment order");
       }
 
-      const orderData = await orderResponse.json()
+      const orderData = await orderResponse.json();
 
       const options = {
         key: orderData.key,
@@ -103,12 +103,12 @@ export function useRazorpay() {
         },
         handler: async function (response: any) {
           try {
-            console.log("Payment success response:", response)
-            
+            console.log("Payment success response:", response);
+
             // Try the main verification endpoint first, then fallback to simple storage
-            let verifyResponse
-            let verifyData
-            
+            let verifyResponse;
+            let verifyData;
+
             try {
               // Try Firebase Admin verification first
               verifyResponse = await fetch("/api/payment/verify", {
@@ -124,21 +124,23 @@ export function useRazorpay() {
                   amount,
                   userId: user.uid,
                 }),
-              })
+              });
 
-              console.log("Verify response status:", verifyResponse.status)
+              console.log("Verify response status:", verifyResponse.status);
 
               if (!verifyResponse.ok) {
-                const errorData = await verifyResponse.json()
-                console.error("Firebase verification failed:", errorData)
-                throw new Error("Firebase verification failed")
+                const errorData = await verifyResponse.json();
+                console.error("Firebase verification failed:", errorData);
+                throw new Error("Firebase verification failed");
               }
 
-              verifyData = await verifyResponse.json()
-              console.log("Firebase verification successful:", verifyData)
+              verifyData = await verifyResponse.json();
+              console.log("Firebase verification successful:", verifyData);
             } catch (firebaseError) {
-              console.log("Firebase verification failed, trying simple storage...")
-              
+              console.log(
+                "Firebase verification failed, trying simple storage..."
+              );
+
               // Fallback to simple storage verification
               verifyResponse = await fetch("/api/payment/verify-simple", {
                 method: "POST",
@@ -153,27 +155,36 @@ export function useRazorpay() {
                   amount,
                   userId: user.uid,
                 }),
-              })
+              });
 
               if (!verifyResponse.ok) {
-                const errorData = await verifyResponse.json()
-                console.error("Simple storage verification failed:", errorData)
-                throw new Error(errorData.details || errorData.error || "Payment verification failed")
+                const errorData = await verifyResponse.json();
+                console.error("Simple storage verification failed:", errorData);
+                throw new Error(
+                  errorData.details ||
+                    errorData.error ||
+                    "Payment verification failed"
+                );
               }
 
-              verifyData = await verifyResponse.json()
-              console.log("Simple storage verification successful:", verifyData)
+              verifyData = await verifyResponse.json();
+              console.log(
+                "Simple storage verification successful:",
+                verifyData
+              );
             }
 
             toast({
               title: "Payment Successful!",
               description: `${credits} credits have been added to your account`,
-            })
+            });
 
             // Add credits using the auth provider function with transaction data
             try {
-              console.log(`Adding ${credits} credits to user account via addCredits function...`)
-              
+              console.log(
+                `Adding ${credits} credits to user account via addCredits function...`
+              );
+
               // Create transaction data for Firebase storage
               const transactionData = {
                 id: response.razorpay_payment_id,
@@ -183,30 +194,32 @@ export function useRazorpay() {
                 amount: amount,
                 status: "success" as const,
                 description: `Purchased ${credits} credits`,
-              }
-              
-              await addCredits(credits, transactionData)
-              console.log("Credits and transaction added successfully via addCredits function")
-              
-              // Force refresh user data and trigger callbacks
-              await refreshUserData()
-              
+              };
+
+              await addCredits(credits, transactionData);
+              console.log(
+                "Credits and transaction added successfully via addCredits function"
+              );
+
               // Call onSuccess callback if provided
               if (onSuccess) {
-                console.log("Calling onSuccess callback...")
-                await onSuccess(transactionData)
+                console.log("Calling onSuccess callback...");
+                await onSuccess(transactionData);
               }
-              
             } catch (creditError) {
-              console.error("Failed to add credits via addCredits function:", creditError)
+              console.error(
+                "Failed to add credits via addCredits function:",
+                creditError
+              );
               // Fallback to refresh user data
               setTimeout(async () => {
-                console.log("Fallback: Refreshing user data after payment success...")
-                await refreshUserData()
-                
+                console.log(
+                  "Fallback: Refreshing user data after payment success..."
+                );
+
                 // Still call onSuccess callback even in fallback
                 if (onSuccess) {
-                  console.log("Calling onSuccess callback in fallback...")
+                  console.log("Calling onSuccess callback in fallback...");
                   await onSuccess({
                     id: response.razorpay_payment_id,
                     orderId: response.razorpay_order_id,
@@ -215,21 +228,22 @@ export function useRazorpay() {
                     amount: amount,
                     status: "success",
                     description: `Purchased ${credits} credits`,
-                  })
+                  });
                 }
-              }, 1000)
+              }, 1000);
             }
-            
-            return verifyData.transaction
+
+            return verifyData.transaction;
           } catch (error) {
-            console.error("Payment verification error:", error)
-            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-            
+            console.error("Payment verification error:", error);
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error occurred";
+
             toast({
               title: "Payment Verification Failed",
               description: `Error: ${errorMessage}. Please contact support if credits were not added.`,
               variant: "destructive",
-            })
+            });
           }
         },
         modal: {
@@ -248,19 +262,19 @@ export function useRazorpay() {
                 amount,
                 userId: user.uid,
               }),
-            })
+            });
 
             toast({
               title: "Payment Cancelled",
               description: "Payment was cancelled by user",
               variant: "destructive",
-            })
+            });
           },
         },
-      }
+      };
 
-      const rzp = new window.Razorpay(options)
-      
+      const rzp = new window.Razorpay(options);
+
       rzp.on("payment.failed", async function (response: any) {
         // Log failed payment
         await fetch("/api/payment/failed", {
@@ -277,30 +291,31 @@ export function useRazorpay() {
             amount,
             userId: user.uid,
           }),
-        })
+        });
 
         toast({
           title: "Payment Failed",
-          description: response.error.description || "Payment failed. Please try again.",
+          description:
+            response.error.description || "Payment failed. Please try again.",
           variant: "destructive",
-        })
-      })
+        });
+      });
 
-      rzp.open()
+      rzp.open();
     } catch (error) {
-      console.error("Payment error:", error)
+      console.error("Payment error:", error);
       toast({
         title: "Payment Error",
         description: "Failed to initiate payment. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return {
     makePayment,
     isLoading,
-  }
+  };
 }

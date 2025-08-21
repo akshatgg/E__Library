@@ -1,34 +1,35 @@
-"use client"
+"use client";
 
-import { useAuthContext } from "@/components/auth-provider"
-import { CreditDisplay } from "@/components/credit-system/credit-display"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useRouter } from "next/navigation"
-import { Search, FileText, Scale, User, Coins } from "lucide-react"
+import {useAuth} from "@/components/auth-provider";
+import {CreditDisplay} from "@/components/credit-system/credit-display";
+import {Button} from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {useRouter} from "next/navigation";
+import {Search, FileText, Scale, User, Coins} from "lucide-react";
+import { useEffect } from "react";
 
 export default function DashboardPage() {
-  const { user, isAuthenticated } = useAuthContext()
-  const router = useRouter()
+  const {user, token, loading} = useAuth();
+  const router = useRouter();
 
-  if (!isAuthenticated) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Welcome to E-Library</h1>
-          <p className="mb-6">Please sign in to access the dashboard</p>
-          <Button onClick={() => router.push("/auth/signin")}>Sign In</Button>
-        </div>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (!user || !token) return router.push("/");
+  }, [user, token]);
 
   return (
     <div className="container mx-auto py-8">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {user?.displayName}</p>
+          <p className="text-muted-foreground">
+            Welcome back, {user?.displayName}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -36,29 +37,41 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Case Laws</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Case Laws
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">1,245</div>
-                  <p className="text-xs text-muted-foreground">+5% from last month</p>
+                  <p className="text-xs text-muted-foreground">
+                    +5% from last month
+                  </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Documents</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Documents
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">342</div>
-                  <p className="text-xs text-muted-foreground">+12% from last month</p>
+                  <p className="text-xs text-muted-foreground">
+                    +12% from last month
+                  </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Searches</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Searches
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">56</div>
-                  <p className="text-xs text-muted-foreground">+2% from last month</p>
+                  <p className="text-xs text-muted-foreground">
+                    +2% from last month
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -66,7 +79,9 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Quick Access</CardTitle>
-                <CardDescription>Access frequently used features</CardDescription>
+                <CardDescription>
+                  Access frequently used features
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -128,13 +143,17 @@ export default function DashboardPage() {
                     <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
                     <div className="flex-1">
                       <p className="text-sm">Searched for "Section 68"</p>
-                      <p className="text-xs text-muted-foreground">2 hours ago</p>
+                      <p className="text-xs text-muted-foreground">
+                        2 hours ago
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center">
                     <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
                     <div className="flex-1">
-                      <p className="text-sm">Viewed document "Partnership Deed"</p>
+                      <p className="text-sm">
+                        Viewed document "Partnership Deed"
+                      </p>
                       <p className="text-xs text-muted-foreground">Yesterday</p>
                     </div>
                   </div>
@@ -142,7 +161,9 @@ export default function DashboardPage() {
                     <div className="w-2 h-2 rounded-full bg-amber-500 mr-2"></div>
                     <div className="flex-1">
                       <p className="text-sm">Added 50 credits</p>
-                      <p className="text-xs text-muted-foreground">3 days ago</p>
+                      <p className="text-xs text-muted-foreground">
+                        3 days ago
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -152,5 +173,5 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
