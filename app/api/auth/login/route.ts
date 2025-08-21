@@ -1,38 +1,123 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { verifyCredentials } from "@/lib/user-service"
-// import { signJWT } from "@/lib/auth"
+// app/api/auth/login/route.ts
+import {NextRequest, NextResponse} from "next/server";
+import {prisma} from "@/lib/prisma";
+import {comparePassword} from "@/lib/helper/auth";
+import {generateToken} from "@/lib/helper/jwt";
+import {sendOtpVerificationEmail} from "@/lib/helper/sendEmail";
+import {generateOTP} from "@/lib/helper/otp";
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const {email, password} = await req.json();
 
     if (!email || !password) {
-      return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
+      return NextResponse.json(
+        {success: false, message: "Email and password are required"},
+        {status: 400}
+      );
     }
 
-    const user = await verifyCredentials(email, password)
+    // Fetch user with password for validation
+    const user = await prisma.user.findUnique({
+      where: {email},
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        password: true,
+        isVerified: true,
+        isActive: true,
+        role: true,
+      },
+    });
 
-    if (!user) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+    // Unified failure message (security: avoid email existence leaks)
+    if (!user || !(await comparePassword(password, user.password))) {
+      return NextResponse.json(
+        {success: false, message: "Invalid email or password"},
+        {status: 401}
+      );
     }
 
-    // Create and set JWT token
-    // const token = await signJWT(user)
+    // Require email verification before login
+    if (!user.isVerified) {
+      const otpRecord = await prisma.oTP.findFirst({
+        where: {userId: user.id, type: "verification"},
+        orderBy: {createdAt: "desc"},
+      });
 
-    const response = NextResponse.json({ success: true, user }, { status: 200 })
+      const now = new Date();
+      const expired = !otpRecord || otpRecord.used || otpRecord.expiresAt < now;
 
-    // response.cookies.set({
-    //   name: "session",
-    //   // value: token,
-    //   httpOnly: true,
-    //   path: "/",
-    //   secure: process.env.NODE_ENV === "production",
-    //   maxAge: 60 * 60 * 24 * 7, // 7 days
-    // })
+      if (expired) {
+        const otp = generateOTP();
+        const expiryMinutes = Number(process.env.OTP_EXPIRE_MINUTES) || 10;
+        const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
-    return response
-  } catch (error) {
-    console.error("Login error:", error)
-    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
+        await prisma.oTP.create({
+          data: {
+            userId: user.id,
+            email: user.email,
+            otp,
+            type: "verification",
+            expiresAt,
+          },
+        });
+
+        sendOtpVerificationEmail(
+          user.email,
+          user.displayName ?? "New Guest",
+          otp,
+          expiryMinutes
+        ).catch((e) => console.error("OTP email error:", e));
+      }
+
+      return NextResponse.json(
+        {
+          success: expired ? true : false,
+          message: expired
+            ? "Account not verified. A new OTP has been sent to your email."
+            : "Account not verified. Please check your email for the OTP.",
+        },
+        {status: 403}
+      );
+    }
+
+    // Parallel: update last login & issue token
+    const [_, token] = await Promise.all([
+      prisma.user.update({
+        where: {id: user.id},
+        data: {lastLoggedin: new Date(), isActive: true},
+      }),
+      generateToken({id: user.id, email: user.email, role: user.role}),
+    ]);
+
+    const {password: _Password, ...safeUser} = user;
+
+    const res = NextResponse.json(
+      {
+        success: true,
+        message: "Login successful",
+        user: safeUser,
+        token,
+      },
+      {status: 200}
+    );
+
+    res.cookies.set("token", token, {
+      httpOnly: true, // prevent JS access
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // expire immediately
+    });
+
+    return res;
+  } catch (err) {
+    console.error("Login error:", err);
+    return NextResponse.json(
+      {success: false, message: "Server error"},
+      {status: 500}
+    );
   }
 }
