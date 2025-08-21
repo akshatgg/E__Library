@@ -15,8 +15,9 @@ model User {
   role         String        @default("user")
   credits      Int           @default(0)
   createdAt    DateTime      @default(now()) @map("created_at")
-  lastLogin    DateTime      @default(now()) @map("last_login")
+  lastLoggedin DateTime      @default(now()) @map("last_login")
   isVerified   Boolean       @default(false) @map("is_verified")
+  isActive     Boolean       @default(false) @map("is_active")
   password     String
   otps         OTP[]
   transactions Transaction[]
@@ -74,15 +75,14 @@ model CaseLaw {
   category    CaseCategory?
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
-  TaxSection  TaxSection?
+  taxSection  TaxSection?   @map("TaxSection")
   caseDetail  CaseDetail?
 
   @@index([tid])
   @@index([category])
   @@index([publishdate])
   @@index([docsource])
-  @@index([TaxSection])
-  @@index([TaxSection], map: "case_laws_taxSection_idx")
+  @@index([taxSection])
   @@map("case_laws")
 }
 
