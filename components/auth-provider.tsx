@@ -7,9 +7,10 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import {setCookies, getCookie, removeCookies} from "cookies-next";
+import {setCookies, removeCookies, getCookie} from "cookies-next";
 import {AuthService} from "@/lib/helper/apiCallFunc";
 import {useRouter} from "next/navigation";
+import {jwtDecode, JwtPayload} from "jwt-decode"; // ✅ fixed import
 
 export type User = {
   id: string;
@@ -19,6 +20,7 @@ export type User = {
   isVerified?: boolean;
   isActive?: boolean;
   credits?: string;
+  lastLoggedin: string;
 };
 
 type ApiResponse<T = any> = {
@@ -32,9 +34,9 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   error: string | null;
-  token: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  access_token: string | null;
+  login: (email: string, password: string) => Promise<ApiResponse>;
+  logout: (id: string) => Promise<void>;
   register: (data: {
     email: string;
     password: string;
@@ -48,7 +50,7 @@ type AuthContextType = {
     otp: string,
     password: string
   ) => Promise<boolean>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<User | null>; // ✅ return type matches setUser
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,81 +65,113 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [access_token, setAccess_token] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
 
-  const saveToken = (token: string) => {
-    setToken(token);
+  const saveToken = useCallback((token: string) => {
+    setAccess_token(token);
     setCookies("token", token, {
-      httpOnly: true,
+      httpOnly: process.env.NODE_ENV === "production",
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // 7 days
     });
-  };
+  }, []);
 
-  const refreshUser = useCallback(async () => {
-    const token = getCookie("token");
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+  const refreshUser = useCallback(async (): Promise<User | null> => {
+    const token = getCookie("token") as string | undefined;
+    if (!token) return null;
+    saveToken(token); // extend cookie
 
     try {
-      const res = (await AuthService.getUser(token as string)) as ApiResponse<{
-        user: User;
-      }>;
-      if (res.success && res.user) setUser(res.user);
-      else setUser(null);
+      setLoading(true);
+
+      const decoded = jwtDecode<JwtPayload & Partial<User>>(token); // ✅ allow optional properties
+
+      if (!decoded.exp || decoded.exp * 1000 < Date.now())
+        throw new Error("Token expired");
+
+      return {
+        id: decoded.id as string,
+        displayName: decoded.displayName as string,
+        email: decoded.email as string,
+        isActive: decoded.isActive,
+        lastLoggedin: decoded.lastLoggedin as string,
+        isVerified: decoded.isVerified,
+        role: decoded.role as string,
+      };
     } catch (err) {
-      console.error("Refresh user failed:", err);
-      removeCookies("token");
-      setUser(null);
+      console.error("JWT decode error:", err);
+      return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [saveToken]);
 
   useEffect(() => {
-    refreshUser();
+    const fetchUser = async () => {
+      const userData = await refreshUser();
+      setUser(userData);
+    };
+
+    fetchUser();
   }, [refreshUser]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<ApiResponse<User | null>> => {
     setError(null);
     try {
-      const res = (await AuthService.login(email, password)) as ApiResponse<{
-        user: User;
-        token: string;
-        message: string;
-      }>;
-      if (!res.success) {
-        setError(res.message || "Login failed");
-        return false;
-      }
-      if (res.success && !res.user?.isVerified) {
-        setError("Account not verified. Please enter OTP.");
-        return false;
-      }
-      if (res.success) {
-        setUser(res?.user);
+      const res = (await AuthService.login(
+        email,
+        password
+      )) as ApiResponse<User>;
 
-        router.push("/");
-        if (res.token) saveToken(res.token);
+      if (!res.success && !res.user) {
+        setError(res.message || "Login failed");
+        return {
+          ...res,
+          user: null, // ensure user is null on failure
+        };
       }
-      return true;
+
+      if (!res.user?.isVerified) {
+        setError("Account not verified. Please enter OTP.");
+        return {
+          ...res,
+          user: null, // optional, failure case
+        };
+      }
+
+      // success case
+      setUser(res.user);
+      if (res.token) saveToken(res.token);
+      router.push("/");
+
+      return res;
     } catch (err: any) {
       setError(err.message || "Login error");
-      return false;
+      return {
+        success: false,
+        message: err.message || "Login error",
+        user: null,
+        token: "",
+      };
     }
   };
 
-  const logout = async () => {
+  const logout = async (id: string): Promise<void> => {
     try {
+      const res = (await AuthService.logout(id)) as ApiResponse<null>;
+      if (!res.success) {
+        setError(res.message || "Logout failed");
+        return;
+      }
       setUser(null);
       removeCookies("token");
       router.push("/auth/signin");
@@ -154,9 +188,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   }) => {
     setError(null);
     try {
-      const res = (await AuthService.register(data)) as ApiResponse<{
-        message?: string;
-      }>;
+      const res = (await AuthService.register(data)) as ApiResponse<null>;
       if (!res.success) setError(res.message || "Registration failed");
       return res.success;
     } catch (err: any) {
@@ -168,10 +200,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   const verifyOtp = async (email: string, otp: string) => {
     setError(null);
     try {
-      const res = (await AuthService.verifyOtp(email, otp)) as ApiResponse<{
-        user: User;
-        token: string | null;
-      }>;
+      const res = (await AuthService.verifyOtp(
+        email,
+        otp
+      )) as ApiResponse<User>;
       if (!res.success) {
         setError(res.message || "Invalid OTP");
         return false;
@@ -193,7 +225,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     try {
       const res = (await AuthService.requestPasswordResetOtp(
         email
-      )) as ApiResponse;
+      )) as ApiResponse<null>;
       if (!res.success) setError(res.message || "Failed to send OTP");
       return res.success;
     } catch (err: any) {
@@ -213,7 +245,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         email,
         otp,
         password
-      )) as ApiResponse;
+      )) as ApiResponse<null>;
       if (!res.success) setError(res.message || "Reset password failed");
       return res.success;
     } catch (err: any) {
@@ -227,7 +259,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       value={{
         user,
         error,
-        token,
+        access_token,
         loading,
         login,
         logout,
@@ -235,7 +267,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         verifyOtp,
         requestPasswordReset,
         resetPassword,
-        refreshUser,
+        refreshUser, // ✅ added to context
       }}
     >
       {children}

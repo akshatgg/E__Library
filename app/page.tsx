@@ -20,15 +20,15 @@ import {useAuth} from "@/components/auth-provider";
 const Chatbot = lazy(() => import("@/components/chatbot/index"));
 
 export default function HomePage() {
-  const {user, token, loading} = useAuth();
+  const {user, access_token, loading} = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     // Only redirect if authentication has been checked and user isn't authenticated
-    if (!token || !user) {
+    if (!access_token || !user) {
       router.push("/auth/signin");
     }
-  }, [user, router, token]);
+  }, [user, router, access_token]);
 
   // Show a smaller, more efficient loading indicator
   if (loading) {
@@ -39,7 +39,7 @@ export default function HomePage() {
     );
   }
 
-  if (!user || !token) {
+  if (!user || !access_token) {
     return null;
   }
 

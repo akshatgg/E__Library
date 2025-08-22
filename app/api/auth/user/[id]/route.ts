@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, {params}: {params: {id: string}}) {
     );
 
     res.cookies.set("token", "", {
-      httpOnly: true, // prevent JS access
+      httpOnly: process.env.NODE_ENV === "production", // prevent JS access
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
@@ -143,6 +143,9 @@ export async function PATCH(
     // Generate new token
     const token = await generateToken({
       email: updatedUser.email,
+      isActive: updatedUser.isActive,
+      isVerified: updatedUser.isVerified,
+      lastLoggedin: updatedUser.lastLoggedin,
       displayName: updatedUser.displayName,
       id: updatedUser.id,
       role: updatedUser.role,
@@ -159,7 +162,7 @@ export async function PATCH(
     );
 
     res.cookies.set("token", `${token}`, {
-      httpOnly: true, // prevent JS access
+      httpOnly: process.env.NODE_ENV === "production", // prevent JS access
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",

@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
         password: true,
         isVerified: true,
         isActive: true,
+        lastLoggedin: true,
         role: true,
       },
     });
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         {
-          success: expired ? true : false,
+          success: false,
           message: expired
             ? "Account not verified. A new OTP has been sent to your email."
             : "Account not verified. Please check your email for the OTP.",
@@ -89,7 +90,15 @@ export async function POST(req: NextRequest) {
         where: {id: user.id},
         data: {lastLoggedin: new Date(), isActive: true},
       }),
-      generateToken({id: user.id, email: user.email, role: user.role}),
+      generateToken({
+        id: user.id,
+        displayName: user.displayName,
+        isVerified: user.isVerified,
+        lastLoggedin: user.lastLoggedin,
+        isActive: user.isActive,
+        email: user.email,
+        role: user.role,
+      }),
     ]);
 
     const {password: _Password, ...safeUser} = user;
@@ -105,7 +114,7 @@ export async function POST(req: NextRequest) {
     );
 
     res.cookies.set("token", token, {
-      httpOnly: true, // prevent JS access
+      httpOnly: process.env.NODE_ENV === "production", // prevent JS access
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",

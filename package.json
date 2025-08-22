@@ -66,6 +66,7 @@
     "fs": "latest",
     "immer": "latest",
     "input-otp": "latest",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.454.0",
     "next": "^15.4.5",
     "next-auth": "latest",
