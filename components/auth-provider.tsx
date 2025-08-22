@@ -30,7 +30,7 @@ type ApiResponse<T = any> = {
   message: string;
 };
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
   loading: boolean;
   error: string | null;

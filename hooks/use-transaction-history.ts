@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuthContext } from "@/components/auth-provider"
+import { useAuth } from "@/components/auth-provider"
 
 interface Transaction {
   id: string
@@ -22,7 +22,7 @@ export function useTransactionHistory() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { user, getTransactions } = useAuthContext()
+  const { user, getTransactions } = useAuth()
 
   const fetchTransactions = async () => {
     if (!user) {

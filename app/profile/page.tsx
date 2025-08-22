@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuthContext } from "@/components/auth-provider"
+import { useAuth } from "@/components/auth-provider"
 import { CreditDisplay } from "@/components/credit-system/credit-display"
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog"
 import { EditProfileDialog } from "@/components/edit-profile-dialog"
@@ -16,7 +16,7 @@ import { useTransactionHistory } from "@/hooks/use-transaction-history"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, signOut, refreshUserData } = useAuthContext()
+  const { user, logout, refreshUser,access_token } = useAuth()
   const router = useRouter()
   const { makePayment, isLoading: isPaymentLoading } = useRazorpay()
   const { transactions, loading: transactionsLoading, refetch } = useTransactionHistory()
@@ -26,10 +26,10 @@ export default function ProfilePage() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!access_token) {
       router.push("/auth/signin")
     }
-  }, [isAuthenticated, router])
+  }, [access_token, router])
 
   const handleCreditPurchase = async (credits: number, amount: number) => {
     try {
@@ -41,7 +41,7 @@ export default function ProfilePage() {
           // Refetch transactions and refresh user data after successful payment
           await Promise.all([
             refetch(),
-            refreshUserData()
+            refreshUser()
           ])
           console.log("Transaction history and user data refreshed")
         }
@@ -75,7 +75,7 @@ export default function ProfilePage() {
   }
 
   const handleSignOut = async () => {
-    await signOut()
+    await logout(user.id)
     router.push("/auth/signin")
   }
 
@@ -132,7 +132,7 @@ export default function ProfilePage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Last Login</p>
-                        <p>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'N/A'}</p>
+                        <p>{user.lastLoggedin ? new Date(user.lastLoggedin).toLocaleString() : 'N/A'}</p>
                       </div>
                     </div>
                   </CardContent>

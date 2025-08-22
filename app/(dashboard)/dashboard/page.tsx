@@ -15,12 +15,12 @@ import {Search, FileText, Scale, User, Coins} from "lucide-react";
 import { useEffect } from "react";
 
 export default function DashboardPage() {
-  const {user, token, loading} = useAuth();
+  const {user, access_token, loading} = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user || !token) return router.push("/");
-  }, [user, token]);
+    if (!user || !access_token) return router.push("/");
+  }, [user, access_token]);
 
   return (
     <div className="container mx-auto py-8">
