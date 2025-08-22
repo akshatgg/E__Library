@@ -197,6 +197,10 @@ export async function PUT(req: NextRequest) {
     // Generate JWT token
     const token = await generateToken({
       id: verifiedUser.id,
+      displayName: verifiedUser.displayName,
+      lastLoggedin: verifiedUser.lastLoggedin,
+      isActive: verifiedUser.isActive,
+      isVerified: verifiedUser.isVerified,
       email: verifiedUser.email,
       role: verifiedUser.role,
     });
@@ -220,7 +224,7 @@ export async function PUT(req: NextRequest) {
     );
 
     res.cookies.set("token", token, {
-      httpOnly: true, // prevent JS access
+      httpOnly: process.env.NODE_ENV === "production", // prevent JS access
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",

@@ -70,7 +70,7 @@ type ResetPasswordForm = z.infer<typeof ResetPasswordSchema>;
 export default function AuthPage() {
   const {
     user,
-    token,
+    access_token,
     login,
     register: registerUser,
     verifyOtp,
@@ -112,13 +112,14 @@ export default function AuthPage() {
 
   // --------------------- If user logged in redirect at home page ---------------------
   useEffect(() => {
-    if (user && token) return router.push("/");
-  }, [user, token]);
+    if (user && access_token) return router.push("/");
+  }, [user, access_token]);
 
   // --------------------- Handlers ---------------------
   const handleEmailSignIn = async (data: SignInForm) => {
-    const success = await login(data.email, data.password);
-    if (!success && error?.includes("unverified")) {
+    const res = await login(data.email, data.password);
+    console.log("res", res);
+    if (!res.success && res.message?.includes("Account not verified")) {
       setShowOtp(true);
       setPrefillEmail(data.email);
       otpForm.reset({email: data.email, otp: ""});
@@ -178,6 +179,7 @@ export default function AuthPage() {
     placeholder,
     register,
     error,
+    disabled,
   }: any) => (
     <div className="space-y-1">
       <Label htmlFor={id}>{placeholder}</Label>
@@ -191,6 +193,7 @@ export default function AuthPage() {
           placeholder={placeholder}
           className="pl-10"
           {...register}
+          disabled={disabled}
         />
       </div>
       {error && <p className="text-red-500 text-xs">{error.message}</p>}
@@ -403,6 +406,7 @@ export default function AuthPage() {
                 placeholder="Email"
                 register={otpForm.register("email")}
                 error={otpForm.formState.errors.email}
+                disabled
               />
               <AuthInput
                 id="otp-code"
@@ -454,6 +458,7 @@ export default function AuthPage() {
                 placeholder="Email"
                 register={resetPassForm.register("email")}
                 error={resetPassForm.formState.errors.email}
+                disabled
               />
               <AuthInput
                 id="doreset-otp"

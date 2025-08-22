@@ -9,17 +9,17 @@ import {useTheme} from "next-themes";
 import {useEffect} from "react";
 
 export default function Navbar() {
-  const {user, logout, token} = useAuth();
+  const {user, logout, access_token} = useAuth();
   const {theme, setTheme} = useTheme();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user && !token) return router.push("/auth/signin");
-  }, [user, token]);
+    if (!user && !access_token) return router.push("/auth/signin");
+  }, [user, access_token]);
 
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 ">
-      {user && token && (
+      {user && access_token && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div
@@ -64,7 +64,7 @@ export default function Navbar() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={logout}
+                onClick={() => logout(user.id)}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign Out

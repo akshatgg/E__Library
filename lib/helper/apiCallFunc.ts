@@ -41,10 +41,10 @@ export const AuthService = {
     }),
 
   // -------------------- User Profile --------------------
-  getUser: (id: string) => apiFetch(`/api/users/${id}`, {method: "GET"}),
+  getUser: (id: string) => apiFetch(`/api/auth/user/${id}`, {method: "GET"}),
 
   updateUser: (id: string, data: UserPayload) =>
-    apiFetch(`/api/users/${id}`, {method: "PATCH", body: data}),
+    apiFetch(`/api/auth/user/${id}`, {method: "PATCH", body: data}),
 
-  logout: (id: string) => apiFetch(`/api/users/${id}`, {method: "POST"}),
+  logout: (id: string) => apiFetch(`/api/auth/user/${id}`, {method: "POST"}),
 };
