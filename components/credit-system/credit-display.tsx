@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuthContext } from "@/components/auth-provider"
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -10,7 +10,7 @@ import { useRazorpay } from "@/hooks/use-razorpay"
 import { useToast } from "@/hooks/use-toast"
 
 export function CreditDisplay() {
-  const { user, refreshUserData, addCredits } = useAuthContext()
+  const { user } = useAuth()
   const { makePayment, isLoading } = useRazorpay()
   const { toast } = useToast()
   const [showPurchase, setShowPurchase] = useState(false)

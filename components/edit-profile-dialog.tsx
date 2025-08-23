@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useAuthContext } from "@/components/auth-provider"
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,7 +22,7 @@ interface EditProfileDialogProps {
 }
 
 export function EditProfileDialog({ open, onOpenChange }: EditProfileDialogProps) {
-  const { user, updateProfile } = useAuthContext()
+  const { user, updateProfile } = useAuth()
   const { toast } = useToast()
   const [displayName, setDisplayName] = useState(user?.displayName || "")
   const [isLoading, setIsLoading] = useState(false)

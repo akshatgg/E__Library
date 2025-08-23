@@ -1,646 +1,383 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { setCookies, removeCookies, getCookie } from "cookies-next";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signOut as firebaseSignOut,
-  getIdToken,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-} from "firebase/auth";
-import { doc, setDoc, getDoc, collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import {setCookies, removeCookies, getCookie} from "cookies-next";
+import {AuthService} from "@/lib/helper/apiCallFunc";
+import {useRouter} from "next/navigation";
+import {jwtDecode, JwtPayload} from "jwt-decode"; // ✅ fixed import
 
-export interface User {
-  uid: string;
+export type User = {
+  id: string;
   email: string;
   displayName: string;
-  credits?: number;
-  createdAt: Date;
-  lastLogin: Date;
-  role: "admin" | "user";
-}
+  role: string;
+  isVerified?: boolean;
+  isActive?: boolean;
+  credits?: number;  // Changed from string to number
+  lastLoggedin: string;
+};
 
-export interface Transaction {
-  id: string;
-  orderId: string;
-  type: "purchase" | "usage" | "refund";
-  credits: number;
-  amount?: number;
-  status: "success" | "failed" | "pending";
-  timestamp: Date;
-  description: string;
-  userId: string;
-}
+type ApiResponse<T = any> = {
+  success: boolean;
+  token: string;
+  user: T;
+  message: string;
+};
 
-interface AuthContextType {
+export type AuthContextType = {
   user: User | null;
   loading: boolean;
-  error: Error | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (
+  error: string | null;
+  access_token: string | null;
+  login: (email: string, password: string) => Promise<ApiResponse>;
+  logout: (id: string) => Promise<void>;
+  register: (data: {
+    email: string;
+    password: string;
+    displayName: string;
+    role?: string;
+  }) => Promise<boolean>;
+  verifyOtp: (email: string, otp: string) => Promise<boolean>;
+  requestPasswordReset: (email: string) => Promise<boolean>;
+  resetPassword: (
     email: string,
-    password: string,
-    displayName: string
-  ) => Promise<void>;
-  signOut: () => Promise<void>;
-  addCredits: (amount: number, transaction?: Partial<Transaction>) => Promise<User>;
-  useCredits: (amount: number) => Promise<User>;
-  refreshUserData: () => Promise<void>;
-  getTransactions: () => Promise<Transaction[]>;
-  addTransaction: (transaction: Omit<Transaction, 'userId'>) => Promise<void>;
-  updateProfile: (updates: Partial<Pick<User, 'displayName'>>) => Promise<void>;
-  isAuthenticated: boolean;
-  resetPassword: (email: string) => Promise<void>;
-}
+    otp: string,
+    password: string
+  ) => Promise<boolean>;
+  updateProfile: (data: { displayName?: string }) => Promise<boolean>;
+  getTransactions: () => Promise<any[]>;
+  refreshUser: () => Promise<User | null>; // ✅ return type matches setUser
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  return context;
+};
+
+export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
+  const [access_token, setAccess_token] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Check if token is expired
-  const isTokenExpired = () => {
-    if (!tokenExpiry) return false;
-    return Date.now() > tokenExpiry;
-  };
+  const router = useRouter();
 
-  // Set token with expiry tracking
-  const setTokenWithExpiry = async (firebaseUser: any) => {
-    const token = await getIdToken(firebaseUser);
-    const expiryTime = Date.now() + (24 * 60 * 60 * 1000); // 24 hours from now
-    
-    setCookies("token", token, { 
-      maxAge: 60 * 60 * 24, // 24 hours in seconds
-      httpOnly: false, // Allow client-side access for manual deletion check
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
+  const saveToken = useCallback((token: string) => {
+    setAccess_token(token);
+    setCookies("token", token, {
+      httpOnly: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
     });
-    
-    // Store expiry time in localStorage to track it
-    localStorage.setItem('tokenExpiry', expiryTime.toString());
-    setTokenExpiry(expiryTime);
-  };
+  }, []);
 
-  // Check for manual token deletion
- // Move checkTokenIntegrity outside useEffect and update it
-const checkTokenIntegrity = useCallback(() => {
-  const cookie = getCookie('token');
-  const storedExpiry = localStorage.getItem('tokenExpiry');
-  
-  // If cookie was manually deleted but we still have user state
-  if (!cookie && user && storedExpiry) {
-    console.log('Token manually deleted, signing out...');
-    handleSignOut();
-    return false;
-  }
-  
-  // If token expired
-  if (storedExpiry && Date.now() > parseInt(storedExpiry)) {
-    console.log('Token expired, signing out...');
-    handleSignOut();
-    return false;
-  }
-  
-  return true;
-}, [user]); // Only depend on user for this function
+  const refreshUser = useCallback(async (): Promise<User | null> => {
+    const token = getCookie("token") as string | undefined;
+    if (!token) return null;
+    saveToken(token); // extend cookie
 
-  // Clean sign out
-  const handleSignOut = async () => {
     try {
-      await firebaseSignOut(auth);
-    } catch (error) {
-      console.error('Error signing out from Firebase:', error);
-    }
-    
-    removeCookies("token");
-    localStorage.removeItem('tokenExpiry');
-    setTokenExpiry(null);
-    setUser(null);
-  };
+      setLoading(true);
 
-  useEffect(() => {
-    // Check token integrity on mount
-    const storedExpiry = localStorage.getItem('tokenExpiry');
-    if (storedExpiry) {
-      setTokenExpiry(parseInt(storedExpiry));
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // First try to get the latest user data from the server
       try {
-        if (firebaseUser && firebaseUser.emailVerified) {
-          // Check if we should respect the user's manual token deletion
-          const cookie = getCookie('token');
-          const storedExpiry = localStorage.getItem('tokenExpiry');
+        if (user?.id) {
+          console.log("Refreshing user data for ID:", user.id);
+          const response = await AuthService.getUser(user.id);
+          console.log("User API response:", response);
           
-          // If cookie was manually deleted, don't restore the session
-          if (!cookie && storedExpiry && user) {
-            console.log('Respecting manual token deletion');
-            await handleSignOut();
-            setLoading(false);
-            return;
-          }
-
-          // If token expired, don't restore the session
-          if (storedExpiry && Date.now() > parseInt(storedExpiry)) {
-            console.log('Token expired, not restoring session');
-            await handleSignOut();
-            setLoading(false);
-            return;
-          }
-
-          // Set/refresh token only if we don't have one or if it's valid
-          if (!cookie || !storedExpiry) {
-            await setTokenWithExpiry(firebaseUser);
-          }
-
-          // Try Firebase first, then simple storage fallback
-          let userData: User | null = null;
-          
-          try {
-            const userRef = doc(db, "users", firebaseUser.uid);
-            const docSnap = await getDoc(userRef);
-
-            if (docSnap.exists()) {
-              userData = docSnap.data() as User;
-              // Update last login
-              const updatedUserData = {
-                ...userData,
-                lastLogin: new Date(),
-              };
-              await setDoc(userRef, updatedUserData);
-              setUser(updatedUserData);
-            } else {
-              // User doesn't exist in Firebase, create new user
-              const newUser: User = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || "",
-                displayName: firebaseUser.displayName || "",
-                credits: 0,
-                role: "user",
-                createdAt: new Date(),
-                lastLogin: new Date(),
-              };
-              await setDoc(userRef, newUser);
-              setUser(newUser);
-            }
-          } catch (firebaseError) {
-            console.log("Firebase user fetch failed, trying simple storage:", firebaseError);
+          if (response.success && response.data) {
+            const userData = response.data as User;
+            console.log("Raw user data from API:", userData, "Credits type:", typeof userData.credits);
             
-            // Fallback to simple storage API
-            try {
-              const response = await fetch(`/api/user/transactions?userId=${firebaseUser.uid}`);
-              if (response.ok) {
-                const data = await response.json();
-                userData = {
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email || "",
-                  displayName: firebaseUser.displayName || "",
-                  credits: data.credits || 0,
-                  role: "user" as const,
-                  createdAt: new Date(),
-                  lastLogin: new Date(),
-                };
-                setUser(userData);
-              } else {
-                // Create new user if simple storage also fails
-                const newUser: User = {
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email || "",
-                  displayName: firebaseUser.displayName || "",
-                  credits: 0,
-                  role: "user",
-                  createdAt: new Date(),
-                  lastLogin: new Date(),
-                };
-                setUser(newUser);
-              }
-            } catch (apiError) {
-              console.log("Simple storage user fetch failed:", apiError);
-              // Create new user as last resort
-              const newUser: User = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || "",
-                displayName: firebaseUser.displayName || "",
-                credits: 0,
-                role: "user",
-                createdAt: new Date(),
-                lastLogin: new Date(),
-              };
-              setUser(newUser);
+            // Ensure credits is stored as a number
+            if (userData.credits !== undefined) {
+              userData.credits = typeof userData.credits === 'number' 
+                ? userData.credits 
+                : parseInt(String(userData.credits)) || 0;
+              console.log("Processed credits value:", userData.credits);
+            } else {
+              console.log("Credits field is undefined in API response");
+              userData.credits = 0;
             }
+            
+            console.log("User data refreshed from server:", userData);
+            setUser(userData);
+            return userData;
+          } else {
+            console.log("API response failed or contains no data");
           }
         } else {
-          await handleSignOut();
+          console.log("No user ID available for refresh");
         }
-      } catch (err: any) {
-        console.error('Auth state change error:', err);
-        setError(err);
-        await handleSignOut();
-      } finally {
-        setLoading(false);
+      } catch (serverError) {
+        console.error("Failed to get user data from server, falling back to token:", serverError);
       }
-    });
 
-    // Set up token integrity checker
-    const tokenCheckInterval = setInterval(() => {
-      if (user) {
-        checkTokenIntegrity();
-      }
-    }, 60000); // Check every minute
+      // Fallback to token data
+      const decoded = jwtDecode<JwtPayload & Partial<User>>(token); // ✅ allow optional properties
 
-    return () => {
-      unsubscribe();
-      clearInterval(tokenCheckInterval);
+      if (!decoded.exp || decoded.exp * 1000 < Date.now())
+        throw new Error("Token expired");
+
+      const userData = {
+        id: decoded.id as string,
+        displayName: decoded.displayName as string,
+        email: decoded.email as string,
+        isActive: decoded.isActive,
+        lastLoggedin: decoded.lastLoggedin as string,
+        isVerified: decoded.isVerified,
+        role: decoded.role as string,
+        credits: decoded.credits,
+      };
+
+      // Update the current user
+      setUser(userData);
+      return userData;
+    } catch (err) {
+      console.error("JWT decode error:", err);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [saveToken, user?.id]);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const userData = await refreshUser();
+      setUser(userData);
     };
-  }, []); // Add user as dependency to handle manual deletions
 
-  const signIn = async (email: string, password: string) => {
+    fetchUser();
+  }, [refreshUser]);
+
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<ApiResponse<User | null>> => {
     setError(null);
     try {
-      const res = await signInWithEmailAndPassword(auth, email, password);
+      const res = (await AuthService.login(
+        email,
+        password
+      )) as ApiResponse<User>;
 
-      if (!res.user.emailVerified) {
-        await firebaseSignOut(auth);
-        throw new Error("Please verify your email before signing in.");
+      if (!res.success && !res.user) {
+        setError(res.message || "Login failed");
+        return {
+          ...res,
+          user: null, // ensure user is null on failure
+        };
       }
 
-      await setTokenWithExpiry(res.user);
-
-      const userRef = doc(db, "users", res.user.uid);
-      const docSnap = await getDoc(userRef);
-      
-      if (docSnap.exists()) {
-        const userData = docSnap.data() as User;
-        const updatedUserData = {
-          ...userData,
-          lastLogin: new Date(),
+      if (!res.user?.isVerified) {
+        setError("Account not verified. Please enter OTP.");
+        return {
+          ...res,
+          user: null, // optional, failure case
         };
-        await setDoc(userRef, updatedUserData);
-        setUser(updatedUserData);
-      } else {
-        const newUser: User = {
-          uid: res.user.uid,
-          email: res.user.email || "",
-          displayName: res.user.displayName || "",
-          credits: 0,
-          role: "user",
-          createdAt: new Date(),
-          lastLogin: new Date(),
-        };
-        await setDoc(userRef, newUser);
-        setUser(newUser);
       }
-    } catch (error) {
-      console.error('Sign in error:', error);
-      throw error;
+
+      // success case
+      setUser(res.user);
+      if (res.token) saveToken(res.token);
+      router.push("/");
+
+      return res;
+    } catch (err: any) {
+      setError(err.message || "Login error");
+      return {
+        success: false,
+        message: err.message || "Login error",
+        user: null,
+        token: "",
+      };
     }
   };
 
-  const signUp = async (
+  const logout = async (id: string): Promise<void> => {
+    try {
+      const res = (await AuthService.logout(id)) as ApiResponse<null>;
+      if (!res.success) {
+        setError(res.message || "Logout failed");
+        return;
+      }
+      setUser(null);
+      removeCookies("token");
+      router.push("/auth/signin");
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+  };
+
+  const register = async (data: {
+    email: string;
+    password: string;
+    displayName: string;
+    role?: string;
+  }) => {
+    setError(null);
+    try {
+      const res = (await AuthService.register(data)) as ApiResponse<null>;
+      if (!res.success) setError(res.message || "Registration failed");
+      return res.success;
+    } catch (err: any) {
+      setError(err.message || "Registration error");
+      return false;
+    }
+  };
+
+  const verifyOtp = async (email: string, otp: string) => {
+    setError(null);
+    try {
+      const res = (await AuthService.verifyOtp(
+        email,
+        otp
+      )) as ApiResponse<User>;
+      if (!res.success) {
+        setError(res.message || "Invalid OTP");
+        return false;
+      }
+      if (res.user) {
+        setUser(res.user);
+        saveToken(res.token);
+        router.push("/");
+      }
+      return true;
+    } catch (err: any) {
+      setError(err.message || "OTP verification error");
+      return false;
+    }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    setError(null);
+    try {
+      const res = (await AuthService.requestPasswordResetOtp(
+        email
+      )) as ApiResponse<null>;
+      if (!res.success) setError(res.message || "Failed to send OTP");
+      return res.success;
+    } catch (err: any) {
+      setError(err.message || "Request password reset error");
+      return false;
+    }
+  };
+
+  const resetPassword = async (
     email: string,
-    password: string,
-    displayName: string
+    otp: string,
+    password: string
   ) => {
     setError(null);
     try {
-      const res = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = res.user.uid;
-
-      const userData: User = {
-        uid,
+      const res = (await AuthService.resetPassword(
         email,
-        displayName,
-        credits: 0,
-        role: "user",
-        createdAt: new Date(),
-        lastLogin: new Date(),
-      };
-
-      await setDoc(doc(db, "users", uid), userData);
-      await sendEmailVerification(res.user);
-
-      // Sign out immediately after registration to prevent access before verification
-      await handleSignOut();
-
-      throw new Error(
-        "Verification email sent. Please check your inbox and verify your email."
-      );
-    } catch (error) {
-      console.error('Sign up error:', error);
-      throw error;
+        otp,
+        password
+      )) as ApiResponse<null>;
+      if (!res.success) setError(res.message || "Reset password failed");
+      return res.success;
+    } catch (err: any) {
+      setError(err.message || "Reset password error");
+      return false;
     }
   };
 
-  const signOut = async () => {
+  const updateProfile = async (data: { displayName?: string }) => {
     setError(null);
-    try {
-      await handleSignOut();
-    } catch (error) {
-      console.error('Sign out error:', error);
-      throw error;
-    }
-  };
-
-  const refreshUserData = async () => {
-    if (!user) {
-      console.log("No user to refresh");
-      return;
-    }
-    
-    console.log("Refreshing user data for:", user.uid);
-    
-    // Try to fetch updated data from Firebase client SDK first
-    try {
-      const userRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(userRef);
-
-      if (docSnap.exists()) {
-        const userData = docSnap.data();
-        console.log("Firebase client refresh - old credits:", user.credits, "new credits:", userData.credits);
-        setUser({ ...user, credits: userData.credits });
-        return;
-      }
-    } catch (firebaseError) {
-      console.log("Firebase client refresh failed, trying simple storage:", firebaseError);
+    if (!user?.id) {
+      setError("User not authenticated");
+      return false;
     }
 
-    // Fallback to simple storage API
     try {
-      console.log("Trying simple storage refresh...");
-      const response = await fetch(`/api/user/transactions?userId=${user.uid}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Simple storage refresh - old credits:", user.credits, "new credits:", data.credits);
-        setUser({ ...user, credits: data.credits || 0 });
-      } else {
-        console.log("Simple storage API response not ok:", response.status);
-      }
-    } catch (apiError) {
-      console.log("Simple storage refresh failed:", apiError);
-    }
-  };
-
-  const addCredits = async (amount: number, transaction?: Partial<Transaction>) => {
-    if (!user) throw new Error("Not authenticated");
-    
-    // Check token integrity before making changes
-    if (!checkTokenIntegrity()) {
-      throw new Error("Authentication expired");
-    }
-    
-    console.log(`Adding ${amount} credits to user ${user.uid} - current: ${user.credits || 0}`);
-    
-    const updated = {
-      ...user,
-      credits: (user.credits || 0) + amount,
-    };
-    
-    // Try Firebase client SDK first
-    try {
-      const userRef = doc(db, "users", user.uid);
-      await setDoc(userRef, updated);
-      console.log("Credits updated successfully via Firebase client SDK");
+      setLoading(true);
+      const res = (await AuthService.updateUser(
+        user.id,
+        data
+      )) as ApiResponse<User>;
       
-      // If transaction data is provided, store it in Firebase
-      if (transaction) {
-        const transactionData: Transaction = {
-          userId: user.uid,
-          timestamp: new Date(),
-          type: "purchase",
-          status: "success",
-          credits: amount,
-          ...transaction,
-        } as Transaction;
-        
-        await addDoc(collection(db, "transactions"), transactionData);
-        console.log("Transaction stored in Firebase:", transactionData);
+      if (!res.success) {
+        setError(res.message || "Profile update failed");
+        return false;
       }
       
-      setUser(updated);
-      return updated;
-    } catch (firebaseError) {
-      console.log("Firebase client addCredits failed, trying simple storage API:", firebaseError);
-      
-      // Fallback to simple storage API
-      try {
-        const response = await fetch("/api/user/add-credits", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: user.uid,
-            credits: amount,
-          }),
-        });
-        
-        if (response.ok) {
-          console.log("Credits added successfully via simple storage API");
-          setUser(updated);
-          return updated;
-        } else {
-          throw new Error("Simple storage API failed");
-        }
-      } catch (apiError) {
-        console.error("Both Firebase and simple storage addCredits failed:", apiError);
-        throw new Error("Failed to add credits");
+      // Update local user state with new data
+      if (res.user) {
+        setUser(prevUser => ({
+          ...prevUser!,
+          ...res.user
+        }));
       }
+      
+      return true;
+    } catch (err: any) {
+      setError(err.message || "Profile update error");
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const useCredits = async (amount: number) => {
-    if (!user) throw new Error("Not authenticated");
-    
-    // Check token integrity before making changes
-    if (!checkTokenIntegrity()) {
-      throw new Error("Authentication expired");
-    }
-    
-    if ((user.credits || 0) < amount) throw new Error("Insufficient credits");
-    
-    const updated = {
-      ...user,
-      credits: (user.credits || 0) - amount,
-    };
-    await setDoc(doc(db, "users", user.uid), updated);
-    setUser(updated);
-    return updated;
-  };
-
-  const resetPassword = async (email: string) => {
+  const getTransactions = useCallback(async () => {
     setError(null);
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error) {
-      console.error('Reset password error:', error);
-      throw error;
+    if (!user?.id) {
+      setError("User not authenticated");
+      return [];
     }
-  };
 
-  const getTransactions = async (): Promise<Transaction[]> => {
-    if (!user) throw new Error("Not authenticated");
-    
-    // Check token integrity before fetching data
-    if (!checkTokenIntegrity()) {
-      throw new Error("Authentication expired");
-    }
-    
     try {
-      // Try Firebase client SDK first
-      const transactionsRef = collection(db, "transactions");
-      const q = query(
-        transactionsRef,
-        where("userId", "==", user.uid),
-        orderBy("timestamp", "desc")
-      );
+      setLoading(true);
+      const response = await AuthService.getTransactions(user.id);
       
-      const querySnapshot = await getDocs(q);
-      const transactions: Transaction[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        transactions.push({
-          ...data,
-          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
-        } as Transaction);
-      });
-      
-      console.log("Transactions fetched from Firebase client SDK:", transactions.length);
-      return transactions;
-    } catch (firebaseError) {
-      console.log("Firebase client transactions fetch failed, trying simple storage API:", firebaseError);
-      
-      // Fallback to simple storage API
-      try {
-        const response = await fetch(`/api/user/transactions?userId=${user.uid}`);
-        if (response.ok) {
-          const data = await response.json();
-          return data.transactions || [];
-        } else {
-          throw new Error("Simple storage API failed");
-        }
-      } catch (apiError) {
-        console.error("Both Firebase and simple storage transactions fetch failed:", apiError);
+      if (!response.success) {
+        setError(response.message || "Failed to fetch transactions");
         return [];
       }
-    }
-  };
-
-  const addTransaction = async (transaction: Omit<Transaction, 'userId'>) => {
-    if (!user) throw new Error("Not authenticated");
-    
-    // Check token integrity before making changes
-    if (!checkTokenIntegrity()) {
-      throw new Error("Authentication expired");
-    }
-    
-    try {
-      const transactionData: Transaction = {
-        ...transaction,
-        userId: user.uid,
-        timestamp: transaction.timestamp || new Date(),
-      };
       
-      // Try Firebase first
-      await addDoc(collection(db, "transactions"), transactionData);
-      console.log("Transaction added to Firebase:", transactionData);
-    } catch (firebaseError) {
-      console.log("Firebase transaction add failed:", firebaseError);
-      // Note: Simple storage doesn't have a direct transaction add endpoint
-      // Transactions are handled via the payment verification endpoints
+      return response.data ? (response.data as any[]) : [];
+    } catch (err: any) {
+      setError(err.message || "Error fetching transactions");
+      console.error("Transaction fetch error:", err);
+      return [];
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const updateProfile = async (updates: Partial<Pick<User, 'displayName'>>) => {
-    if (!user) throw new Error("Not authenticated");
-    
-    // Check token integrity before making changes
-    if (!checkTokenIntegrity()) {
-      throw new Error("Authentication expired");
-    }
-    
-    try {
-      const updatedUser = {
-        ...user,
-        ...updates,
-      };
-      
-      // Try Firebase client SDK first
-      const userRef = doc(db, "users", user.uid);
-      await setDoc(userRef, updatedUser);
-      console.log("Profile updated successfully via Firebase client SDK");
-      
-      setUser(updatedUser);
-    } catch (firebaseError) {
-      console.error("Firebase profile update failed:", firebaseError);
-      throw new Error("Failed to update profile");
-    }
-  };
-
-  const value: AuthContextType = {
-    user,
-    loading,
-    error,
-    signIn,
-    signUp,
-    signOut,
-    addCredits,
-    useCredits,
-    refreshUserData,
-    getTransactions,
-    addTransaction,
-    updateProfile,
-    isAuthenticated: !!user && !isTokenExpired(),
-    resetPassword,
-  };
+  }, [user?.id, setError, setLoading]); // Add dependencies
 
   return (
-    <AuthContext.Provider value={value}>
-      {loading ? (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading application...</p>
-          </div>
-        </div>
-      ) : error ? (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-pink-100">
-          <div className="text-center p-8 bg-white rounded-lg shadow-lg">
-            <h2 className="text-xl font-bold text-red-600 mb-4">
-              Application Error
-            </h2>
-            <p className="text-gray-600 mb-4">{error.message}</p>
-            <button
-              onClick={() => {
-                setError(null);
-                window.location.reload();
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      ) : (
-        children
-      )}
+    <AuthContext.Provider
+      value={{
+        user,
+        error,
+        access_token,
+        loading,
+        login,
+        logout,
+        register,
+        verifyOtp,
+        requestPasswordReset,
+        resetPassword,
+        updateProfile,
+        getTransactions,
+        refreshUser, // ✅ added to context
+      }}
+    >
+      {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuthContext() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuthContext must be used within an AuthProvider");
-  }
-  return context;
-}
-
-export const useAuth = useAuthContext;
+};

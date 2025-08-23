@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useAuthContext } from "@/components/auth-provider"
+import { useState, useEffect, useCallback } from "react"
+import { useAuth } from "@/components/auth-provider"
 
-interface Transaction {
+export interface Transaction {
   id: string
   orderId: string
   type: string
   credits: number
   amount: number
   status: "success" | "failed" | "pending"
-  timestamp: Date
+  timestamp: Date | string
   description: string
   error?: {
     code: string
@@ -22,9 +22,10 @@ export function useTransactionHistory() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { user, getTransactions } = useAuthContext()
+  const { user, getTransactions } = useAuth()
 
-  const fetchTransactions = async () => {
+  // Use useCallback to memoize the fetch function
+  const fetchTransactions = useCallback(async () => {
     if (!user) {
       setLoading(false)
       return
@@ -34,12 +35,19 @@ export function useTransactionHistory() {
       setLoading(true)
       setError(null)
       
-      console.log("Fetching transactions for user:", user.uid)
+      console.log("Fetching transactions for user:", user.id)
       
-      // Use the auth provider's getTransactions method which handles Firebase and fallback
+      // Use the auth provider's getTransactions method
       const userTransactions = await getTransactions()
       
-      console.log("Fetched transactions:", userTransactions.length)
+      console.log("Fetched transactions:", userTransactions?.length || 0, "Raw:", userTransactions)
+      
+      if (!userTransactions || !Array.isArray(userTransactions)) {
+        console.error("Invalid transactions response format:", userTransactions)
+        setError("Invalid response format from server")
+        setTransactions([])
+        return
+      }
       
       // Sort transactions by timestamp (newest first)
       const sortedTransactions = userTransactions
@@ -49,9 +57,11 @@ export function useTransactionHistory() {
             transaction.timestamp : 
             new Date(transaction.timestamp)
         }))
-        .sort((a: Transaction, b: Transaction) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        )
+        .sort((a: Transaction, b: Transaction) => {
+          const dateA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp)
+          const dateB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp)
+          return dateB.getTime() - dateA.getTime()
+        })
 
       setTransactions(sortedTransactions)
     } catch (err) {
@@ -61,16 +71,18 @@ export function useTransactionHistory() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, getTransactions]); // Include dependencies
 
   useEffect(() => {
-    fetchTransactions()
-  }, [user?.uid]) // Only depend on user ID, not the entire user object
+    if (user?.id) {
+      fetchTransactions();
+    }
+  }, [user?.id, fetchTransactions]);
 
-  const refetch = () => {
+  const refetch = useCallback(() => {
     console.log("Manual transaction refetch triggered")
     fetchTransactions()
-  }
+  }, [fetchTransactions]);
 
   return {
     transactions,
