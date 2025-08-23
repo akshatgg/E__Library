@@ -19,7 +19,7 @@ export type User = {
   role: string;
   isVerified?: boolean;
   isActive?: boolean;
-  credits?: string;
+  credits?: number;  // Changed from string to number
   lastLoggedin: string;
 };
 
@@ -50,6 +50,8 @@ export type AuthContextType = {
     otp: string,
     password: string
   ) => Promise<boolean>;
+  updateProfile: (data: { displayName?: string }) => Promise<boolean>;
+  getTransactions: () => Promise<any[]>;
   refreshUser: () => Promise<User | null>; // ✅ return type matches setUser
 };
 
@@ -90,12 +92,48 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     try {
       setLoading(true);
 
+      // First try to get the latest user data from the server
+      try {
+        if (user?.id) {
+          console.log("Refreshing user data for ID:", user.id);
+          const response = await AuthService.getUser(user.id);
+          console.log("User API response:", response);
+          
+          if (response.success && response.data) {
+            const userData = response.data as User;
+            console.log("Raw user data from API:", userData, "Credits type:", typeof userData.credits);
+            
+            // Ensure credits is stored as a number
+            if (userData.credits !== undefined) {
+              userData.credits = typeof userData.credits === 'number' 
+                ? userData.credits 
+                : parseInt(String(userData.credits)) || 0;
+              console.log("Processed credits value:", userData.credits);
+            } else {
+              console.log("Credits field is undefined in API response");
+              userData.credits = 0;
+            }
+            
+            console.log("User data refreshed from server:", userData);
+            setUser(userData);
+            return userData;
+          } else {
+            console.log("API response failed or contains no data");
+          }
+        } else {
+          console.log("No user ID available for refresh");
+        }
+      } catch (serverError) {
+        console.error("Failed to get user data from server, falling back to token:", serverError);
+      }
+
+      // Fallback to token data
       const decoded = jwtDecode<JwtPayload & Partial<User>>(token); // ✅ allow optional properties
 
       if (!decoded.exp || decoded.exp * 1000 < Date.now())
         throw new Error("Token expired");
 
-      return {
+      const userData = {
         id: decoded.id as string,
         displayName: decoded.displayName as string,
         email: decoded.email as string,
@@ -103,14 +141,19 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         lastLoggedin: decoded.lastLoggedin as string,
         isVerified: decoded.isVerified,
         role: decoded.role as string,
+        credits: decoded.credits,
       };
+
+      // Update the current user
+      setUser(userData);
+      return userData;
     } catch (err) {
       console.error("JWT decode error:", err);
       return null;
     } finally {
       setLoading(false);
     }
-  }, [saveToken]);
+  }, [saveToken, user?.id]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -254,6 +297,68 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     }
   };
 
+  const updateProfile = async (data: { displayName?: string }) => {
+    setError(null);
+    if (!user?.id) {
+      setError("User not authenticated");
+      return false;
+    }
+
+    try {
+      setLoading(true);
+      const res = (await AuthService.updateUser(
+        user.id,
+        data
+      )) as ApiResponse<User>;
+      
+      if (!res.success) {
+        setError(res.message || "Profile update failed");
+        return false;
+      }
+      
+      // Update local user state with new data
+      if (res.user) {
+        setUser(prevUser => ({
+          ...prevUser!,
+          ...res.user
+        }));
+      }
+      
+      return true;
+    } catch (err: any) {
+      setError(err.message || "Profile update error");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTransactions = useCallback(async () => {
+    setError(null);
+    if (!user?.id) {
+      setError("User not authenticated");
+      return [];
+    }
+
+    try {
+      setLoading(true);
+      const response = await AuthService.getTransactions(user.id);
+      
+      if (!response.success) {
+        setError(response.message || "Failed to fetch transactions");
+        return [];
+      }
+      
+      return response.data ? (response.data as any[]) : [];
+    } catch (err: any) {
+      setError(err.message || "Error fetching transactions");
+      console.error("Transaction fetch error:", err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, setError, setLoading]); // Add dependencies
+
   return (
     <AuthContext.Provider
       value={{
@@ -267,6 +372,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         verifyOtp,
         requestPasswordReset,
         resetPassword,
+        updateProfile,
+        getTransactions,
         refreshUser, // ✅ added to context
       }}
     >

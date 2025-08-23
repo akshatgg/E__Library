@@ -24,7 +24,10 @@ export async function GET(req: NextRequest, {params}: {params: {id: string}}) {
         email: true,
         role: true,
         createdAt: true,
-        // updatedAt: true,
+        credits: true,  // Add credits field
+        lastLoggedin: true,  // Add last login time
+        isVerified: true,
+        isActive: true,
         // exclude sensitive fields like password, refreshToken, etc.
       },
     });
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest, {params}: {params: {id: string}}) {
     }
 
     return NextResponse.json(
-      {success: true, message: "User fetched successfully", user},
+      {success: true, message: "User fetched successfully", data: user},
       {status: 200}
     );
   } catch (error) {

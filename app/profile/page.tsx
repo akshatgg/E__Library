@@ -25,11 +25,36 @@ export default function ProfilePage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
 
+  // Authentication check
   useEffect(() => {
     if (!access_token) {
       router.push("/auth/signin")
     }
   }, [access_token, router])
+  
+  // Separate effect for data initialization - runs only once on mount
+  useEffect(() => {
+    // Don't attempt to load data if not authenticated
+    if (!access_token) return
+    
+    // Refresh user data and transactions when the page loads
+    const initializeData = async () => {
+      try {
+        console.log("Initializing profile data...")
+        const userData = await refreshUser()
+        console.log("Profile - User data after refresh:", userData)
+        console.log("Profile - Current user state:", user)
+        
+        await refetch()
+        console.log("Initial data load complete")
+      } catch (error) {
+        console.error("Failed to initialize profile data:", error)
+      }
+    }
+    
+    initializeData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty dependency array means it runs once on mount
 
   const handleCreditPurchase = async (credits: number, amount: number) => {
     try {
@@ -38,12 +63,30 @@ export default function ProfilePage() {
         amount,
         onSuccess: async (transaction) => {
           console.log("Payment success callback triggered:", transaction)
+          
           // Refetch transactions and refresh user data after successful payment
-          await Promise.all([
-            refetch(),
-            refreshUser()
-          ])
-          console.log("Transaction history and user data refreshed")
+          try {
+            // Add a small delay to allow backend processing to complete
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+            // Refresh both in parallel
+            const [userData, _] = await Promise.all([
+              refreshUser(),
+              refetch()
+            ])
+            
+            console.log("Transaction history and user data refreshed:", 
+              userData ? `Credits: ${userData.credits}` : "No user data returned")
+            
+            // Show success toast
+            toast({
+              title: "Credits Added Successfully",
+              description: `${credits} credits have been added to your account.`,
+              variant: "default",
+            })
+          } catch (refreshError) {
+            console.error("Error refreshing data:", refreshError)
+          }
         }
       })
     } catch (error) {
@@ -79,6 +122,10 @@ export default function ProfilePage() {
     router.push("/auth/signin")
   }
 
+  // Debug output
+  console.log("Profile render - User object:", user);
+  console.log("Credits value:", user?.credits, "Type:", typeof user?.credits);
+
   return (
     <div className="container mx-auto py-8">
       <div className="space-y-6">
@@ -87,9 +134,25 @@ export default function ProfilePage() {
             <h1 className="text-3xl font-bold">My Profile</h1>
             <p className="text-muted-foreground">Manage your account and credits</p>
           </div>
-          <Button variant="outline" onClick={handleSignOut}>
-            Sign Out
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={async () => {
+                const userData = await refreshUser();
+                console.log("Manual refresh - User data:", userData);
+                toast({
+                  title: "Profile Refreshed",
+                  description: `Credits: ${userData?.credits || 0}`,
+                });
+              }}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button variant="outline" onClick={handleSignOut}>
+              Sign Out
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -150,7 +213,15 @@ export default function ProfilePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Current Balance</p>
-                          <p className="text-3xl font-bold">{user.credits} credits</p>
+                          <p className="text-3xl font-bold">
+                            {(() => {
+                              console.log("Rendering credits value:", user.credits, "Type:", typeof user.credits);
+                              const creditsValue = typeof user.credits === 'number' 
+                                ? user.credits 
+                                : (user.credits ? parseInt(String(user.credits)) : 0);
+                              return `${creditsValue} credits`;
+                            })()}
+                          </p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Credit Usage</p>

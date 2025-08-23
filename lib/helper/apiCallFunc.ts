@@ -46,5 +46,8 @@ export const AuthService = {
   updateUser: (id: string, data: UserPayload) =>
     apiFetch(`/api/auth/user/${id}`, {method: "PATCH", body: data}),
 
+  getTransactions: (userId: string) =>
+    apiFetch(`/api/user/${userId}/transactions`, {method: "GET"}),
+    
   logout: (id: string) => apiFetch(`/api/auth/user/${id}`, {method: "POST"}),
 };

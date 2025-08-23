@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +15,7 @@ export async function POST(request: NextRequest) {
       credits,
       amount,
       userId,
+      transactionId, // Added to keep track of our database transaction record
     } = await request.json()
 
     console.log("Payment verification data:", {
@@ -47,31 +51,80 @@ export async function POST(request: NextRequest) {
     })
 
     if (!isAuthentic) {
+      // If we have a transactionId, update it to failed status
+      if (transactionId) {
+        await prisma.transaction.update({
+          where: { id: transactionId },
+          data: { status: "failed" }
+        })
+      }
+      
       return NextResponse.json(
         { error: "Payment verification failed - Invalid signature" },
         { status: 400 }
       )
     }
-
-    // Payment is verified, return success (credits will be added by client-side addCredits function)
-    const transaction = {
-      id: razorpay_payment_id,
-      orderId: razorpay_order_id,
-      type: "purchase",
-      credits: parseInt(credits),
-      amount: amount,
-      status: "success",
-      timestamp: new Date(),
-      description: `Purchased ${credits} credits`,
+    
+    // Find the user in the database by id
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+    
+    if (!user) {
+      console.error("User not found with ID:", userId)
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      )
     }
 
-    console.log("Payment verification completed successfully, transaction:", transaction)
+    // Update transaction if we have a transactionId, or create one if not
+    let dbTransaction;
+    
+    if (transactionId) {
+      // Update existing transaction
+      dbTransaction = await prisma.transaction.update({
+        where: { id: transactionId },
+        data: {
+          status: "success"
+        }
+      })
+    } else {
+      // Create a new transaction record (fallback if transactionId isn't provided)
+      dbTransaction = await prisma.transaction.create({
+        data: {
+          userId: user.id,
+          orderId: razorpay_order_id,
+          amount: Number(amount),
+          credits: Number(credits),
+          description: `Purchased ${credits} credits`,
+          status: "success",
+          type: "purchase"
+        }
+      })
+    }
+    
+    // Update the user's credits
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        credits: {
+          increment: Number(credits)
+        }
+      }
+    })
+    
+    console.log("Payment verification completed successfully, transaction:", dbTransaction)
+    console.log("User credits updated:", updatedUser.credits)
 
-    // Don't update credits here - let the client-side addCredits function handle it
     return NextResponse.json({
       success: true,
       message: "Payment verified successfully",
-      transaction,
+      transaction: dbTransaction,
+      user: {
+        id: updatedUser.id,
+        credits: updatedUser.credits
+      }
     })
   } catch (error) {
     console.error("Error verifying payment:", error)
@@ -93,5 +146,7 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
+  } finally {
+    await prisma.$disconnect()
   }
 }

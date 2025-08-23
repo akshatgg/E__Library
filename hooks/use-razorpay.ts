@@ -70,22 +70,32 @@ export function useRazorpay() {
       }
 
       // Create order
+      console.log("Creating order with user ID:", user.id);
+      
+      const orderPayload = {
+        amount,
+        credits,
+        userId: user.id,
+      };
+      
+      console.log("Order payload:", orderPayload);
+      
       const orderResponse = await fetch("/api/payment/create-order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          amount,
-          credits,
-        }),
+        body: JSON.stringify(orderPayload),
       });
 
       if (!orderResponse.ok) {
-        throw new Error("Failed to create payment order");
+        const errorData = await orderResponse.json();
+        console.error("Order creation failed:", errorData);
+        throw new Error(errorData.error || errorData.details || "Failed to create payment order");
       }
 
       const orderData = await orderResponse.json();
+      console.log("Order created successfully:", orderData);
 
       const options = {
         key: orderData.key,
@@ -105,132 +115,60 @@ export function useRazorpay() {
           try {
             console.log("Payment success response:", response);
 
-            // Try the main verification endpoint first, then fallback to simple storage
-            let verifyResponse;
-            let verifyData;
+            // Use a single verification endpoint - no fallbacks
+            const verifyResponse = await fetch("/api/payment/verify", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                credits,
+                amount,
+                userId: user.id,
+                transactionId: orderData.transactionId,
+              }),
+            });
 
-            try {
-              // Try Firebase Admin verification first
-              verifyResponse = await fetch("/api/payment/verify", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  credits,
-                  amount,
-                  userId: user.uid,
-                }),
-              });
+            console.log("Verify response status:", verifyResponse.status);
 
-              console.log("Verify response status:", verifyResponse.status);
-
-              if (!verifyResponse.ok) {
-                const errorData = await verifyResponse.json();
-                console.error("Firebase verification failed:", errorData);
-                throw new Error("Firebase verification failed");
-              }
-
-              verifyData = await verifyResponse.json();
-              console.log("Firebase verification successful:", verifyData);
-            } catch (firebaseError) {
-              console.log(
-                "Firebase verification failed, trying simple storage..."
-              );
-
-              // Fallback to simple storage verification
-              verifyResponse = await fetch("/api/payment/verify-simple", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  credits,
-                  amount,
-                  userId: user.uid,
-                }),
-              });
-
-              if (!verifyResponse.ok) {
-                const errorData = await verifyResponse.json();
-                console.error("Simple storage verification failed:", errorData);
-                throw new Error(
-                  errorData.details ||
-                    errorData.error ||
-                    "Payment verification failed"
-                );
-              }
-
-              verifyData = await verifyResponse.json();
-              console.log(
-                "Simple storage verification successful:",
-                verifyData
+            if (!verifyResponse.ok) {
+              const errorData = await verifyResponse.json();
+              console.error("Payment verification failed:", errorData);
+              throw new Error(
+                errorData.details ||
+                  errorData.error ||
+                  "Payment verification failed"
               );
             }
+
+            const verifyData = await verifyResponse.json();
+            console.log("Payment verification successful:", verifyData);
 
             toast({
               title: "Payment Successful!",
               description: `${credits} credits have been added to your account`,
             });
 
-            // Add credits using the auth provider function with transaction data
-            try {
-              console.log(
-                `Adding ${credits} credits to user account via addCredits function...`
-              );
+            console.log("Credits added in the backend successfully");
 
-              // Create transaction data for Firebase storage
-              const transactionData = {
-                id: response.razorpay_payment_id,
-                orderId: response.razorpay_order_id,
-                type: "purchase" as const,
-                credits: credits,
-                amount: amount,
-                status: "success" as const,
-                description: `Purchased ${credits} credits`,
-              };
+            // Create transaction data from the verification response
+            const transactionData = verifyData.transaction || {
+              id: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              type: "purchase" as const,
+              credits: credits,
+              amount: amount,
+              status: "success" as const,
+              description: `Purchased ${credits} credits`,
+            };
 
-              await addCredits(credits, transactionData);
-              console.log(
-                "Credits and transaction added successfully via addCredits function"
-              );
-
-              // Call onSuccess callback if provided
-              if (onSuccess) {
-                console.log("Calling onSuccess callback...");
-                await onSuccess(transactionData);
-              }
-            } catch (creditError) {
-              console.error(
-                "Failed to add credits via addCredits function:",
-                creditError
-              );
-              // Fallback to refresh user data
-              setTimeout(async () => {
-                console.log(
-                  "Fallback: Refreshing user data after payment success..."
-                );
-
-                // Still call onSuccess callback even in fallback
-                if (onSuccess) {
-                  console.log("Calling onSuccess callback in fallback...");
-                  await onSuccess({
-                    id: response.razorpay_payment_id,
-                    orderId: response.razorpay_order_id,
-                    type: "purchase",
-                    credits: credits,
-                    amount: amount,
-                    status: "success",
-                    description: `Purchased ${credits} credits`,
-                  });
-                }
-              }, 1000);
+            // Call onSuccess callback if provided
+            if (onSuccess) {
+              console.log("Calling onSuccess callback...");
+              await onSuccess(transactionData);
             }
 
             return verifyData.transaction;
@@ -260,7 +198,8 @@ export function useRazorpay() {
                 error_description: "Payment cancelled by user",
                 credits,
                 amount,
-                userId: user.uid,
+                userId: user.id,
+                transactionId: orderData.transactionId,
               }),
             });
 
@@ -289,7 +228,8 @@ export function useRazorpay() {
             error_description: response.error.description,
             credits,
             amount,
-            userId: user.uid,
+            userId: user.id,
+            transactionId: orderData.transactionId,
           }),
         });
 
