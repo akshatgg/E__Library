@@ -75,15 +75,14 @@ model CaseLaw {
   category    CaseCategory?
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
-  TaxSection  TaxSection?
+  taxSection  TaxSection?   @map("TaxSection")
   caseDetail  CaseDetail?
 
   @@index([tid])
   @@index([category])
   @@index([publishdate])
   @@index([docsource])
-  @@index([TaxSection])
-  @@index([TaxSection], map: "case_laws_taxSection_idx")
+  @@index([taxSection])
   @@map("case_laws")
 }
 
