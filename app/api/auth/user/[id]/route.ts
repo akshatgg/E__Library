@@ -107,7 +107,7 @@ export async function PATCH(
       );
     }
 
-    const {displayName, email, password, role = "user"} = await req.json();
+    const {displayName, email, password, role = "user", credits} = await req.json();
 
     // Prepare dynamic update object
     const dataToUpdate: any = {
@@ -115,6 +115,7 @@ export async function PATCH(
       ...(email && {email}),
       ...(role && {role}),
       ...(password && {password: await hashPassword(password)}),
+      ...(credits !== undefined && {credits}), // Add credits field support
     };
 
     // Check if email is already used by another user
@@ -140,6 +141,7 @@ export async function PATCH(
         isActive: true,
         lastLoggedin: true,
         role: true,
+        credits: true, // Include credits in response
       },
     });
 
@@ -152,6 +154,7 @@ export async function PATCH(
       displayName: updatedUser.displayName,
       id: updatedUser.id,
       role: updatedUser.role,
+      credits: updatedUser.credits, // Include credits in token
     });
 
     const res = NextResponse.json(

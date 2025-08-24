@@ -6,6 +6,7 @@ type UserPayload = {
   password?: string;
   displayName?: string;
   role?: string;
+  credits?: number;
 };
 
 export const AuthService = {

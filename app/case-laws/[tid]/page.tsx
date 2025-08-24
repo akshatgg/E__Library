@@ -5,6 +5,8 @@ import { ArrowLeft, ChevronDown, ChevronUp, Loader, Loader2 } from "lucide-react
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getCaseDetail } from "../actions";
+import { useCreditService } from "@/services/credit-service";
+import { toast } from "@/hooks/use-toast";
 
 interface CaseData {
   success: boolean;
@@ -33,7 +35,9 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [showFullJudgment, setShowFullJudgment] = useState(false);
+  const [creditVerified, setCreditVerified] = useState(false);
   const router = useRouter();
+  const { spendCredits, hasEnoughCredits, creditCosts } = useCreditService();
   const stripHtmlTags = (html: string) => {
     // Special handling for legal document structure
     let text = html
@@ -199,8 +203,78 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const resolvedParams = params instanceof Promise ? use(params) : params;
   const tid = parseInt(resolvedParams.tid, 10);
 
+  // Credit verification effect - runs first
+  useEffect(() => {
+    const verifyCredits = async () => {
+      const caseId = tid.toString();
+      
+      // Check if this case was already viewed in this session
+      const viewedCasesKey = 'viewed-cases';
+      const viewedCases = JSON.parse(sessionStorage.getItem(viewedCasesKey) || '[]');
+      
+      // Check if credits were already paid from dashboard
+      const fromDashboard = sessionStorage.getItem(`case-${caseId}-accessed`);
+      
+      if (fromDashboard || viewedCases.includes(caseId)) {
+        // Already paid or accessed, just allow access
+        setCreditVerified(true);
+        // Clear the session flag if it exists
+        if (fromDashboard) {
+          sessionStorage.removeItem(`case-${caseId}-accessed`);
+        }
+        return;
+      }
+      
+      // Direct access - need to charge credits
+      if (!hasEnoughCredits(creditCosts.DOCUMENT_VIEW)) {
+        toast({
+          title: "Insufficient Credits",
+          description: `You need ${creditCosts.DOCUMENT_VIEW} credits to view case details`,
+          variant: "destructive",
+        });
+        router.push("/profile");
+        return;
+      }
+
+      // Charge credits for direct access
+      const success = await spendCredits(
+        creditCosts.DOCUMENT_VIEW,
+        `Direct Case Details Access: TID ${tid}`
+      );
+
+      if (success) {
+        setCreditVerified(true);
+        
+        // Mark case as viewed in this session
+        viewedCases.push(caseId);
+        sessionStorage.setItem(viewedCasesKey, JSON.stringify(viewedCases));
+        
+        toast({
+          title: "Credits Deducted",
+          description: `${creditCosts.DOCUMENT_VIEW} credits deducted for case access`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Payment Failed",
+          description: "Failed to process credits. Please try again.",
+          variant: "destructive",
+        });
+        router.push("/profile");
+        return;
+      }
+    };
+
+    if (tid) {
+      verifyCredits();
+    }
+  }, [tid, hasEnoughCredits, creditCosts.DOCUMENT_VIEW, spendCredits, router]);
+
   useEffect(() => {
     async function fetchCase() {
+      // Only fetch if credits are verified
+      if (!creditVerified) return;
+      
       try {
         setLoading(true);
         const result = await getCaseDetail(tid);
@@ -217,10 +291,10 @@ export default function CasePage({ params }: { params: { tid: string } }) {
       }
     }
 
-    if (tid) {
+    if (tid && creditVerified) {
       fetchCase();
     }
-  }, [tid]);
+  }, [tid, creditVerified]);
 
   const extractCaseInfo = (htmlContent: string) => {
     const parser = new DOMParser();

@@ -54,6 +54,8 @@ export type AuthContextType = {
   getTransactions: () => Promise<any[]>;
   refreshUser: () => Promise<User | null>; // ✅ return type matches setUser
   isTokenValid: () => boolean; // Utility to check if current token is valid
+  useCredits: (amount: number) => Promise<void>; // Credit usage function
+  addCredits: (amount: number) => Promise<void>; // Credit addition function
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -466,6 +468,99 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     }
   }, []);
 
+  // Credit management functions
+  const useCredits = useCallback(async (amount: number): Promise<void> => {
+    if (!user?.id) {
+      throw new Error("User not authenticated");
+    }
+
+    if (!user.credits || user.credits < amount) {
+      throw new Error(`Insufficient credits. You need ${amount} credits but have ${user.credits || 0}.`);
+    }
+
+    try {
+      // Update credits in the backend
+      const response = await AuthService.updateUser(user.id, {
+        credits: user.credits - amount
+      });
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to update credits");
+      }
+
+      // The response.data contains the actual response from the API
+      const apiData = response.data as any;
+
+      // Save the new token if provided
+      if (apiData?.token) {
+        saveToken(apiData.token);
+      }
+
+      // Update local user state with the response data
+      if (apiData?.user) {
+        setUser(prevUser => prevUser ? {
+          ...prevUser,
+          ...apiData.user,
+          credits: apiData.user.credits
+        } : null);
+      } else {
+        // Fallback to manual update if user data not in response
+        setUser(prevUser => prevUser ? {
+          ...prevUser,
+          credits: (prevUser.credits || 0) - amount
+        } : null);
+      }
+
+    } catch (error) {
+      console.error("Error using credits:", error);
+      throw error;
+    }
+  }, [user]);
+
+  const addCredits = useCallback(async (amount: number): Promise<void> => {
+    if (!user?.id) {
+      throw new Error("User not authenticated");
+    }
+
+    try {
+      // Update credits in the backend
+      const response = await AuthService.updateUser(user.id, {
+        credits: (user.credits || 0) + amount
+      });
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to add credits");
+      }
+
+      // The response.data contains the actual response from the API
+      const apiData = response.data as any;
+
+      // Save the new token if provided
+      if (apiData?.token) {
+        saveToken(apiData.token);
+      }
+
+      // Update local user state with the response data
+      if (apiData?.user) {
+        setUser(prevUser => prevUser ? {
+          ...prevUser,
+          ...apiData.user,
+          credits: apiData.user.credits
+        } : null);
+      } else {
+        // Fallback to manual update if user data not in response
+        setUser(prevUser => prevUser ? {
+          ...prevUser,
+          credits: (prevUser.credits || 0) + amount
+        } : null);
+      }
+
+    } catch (error) {
+      console.error("Error adding credits:", error);
+      throw error;
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -483,9 +578,19 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         getTransactions,
         refreshUser,
         isTokenValid, // Added token validation utility
+        useCredits, // Credit management functions
+        addCredits,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuthContext = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuthContext must be used within an AuthProvider");
+  }
+  return context;
 };

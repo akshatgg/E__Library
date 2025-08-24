@@ -9,6 +9,8 @@ import CaseTablePDF from "../pdf/CaseTablePDF";
 import { pdf } from "@react-pdf/renderer";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
+import { useCreditService } from "@/services/credit-service";
+import { usePageCredits } from "@/hooks/use-page-credits";
 
 import {
   Select,
@@ -102,8 +104,10 @@ export function CaseLawsDashboard() {
   const [lastPageReached, setLastPageReached] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [activeTab, setActiveTab] = useState("search"); // Track active tab
+  const [actionLoading, setActionLoading] = useState(false);
 
   const router = useRouter();
+  const { spendCredits, hasEnoughCredits, creditCosts } = useCreditService();
 
   // Cache implementation
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
@@ -548,6 +552,109 @@ export function CaseLawsDashboard() {
       setCurrentPage(page);
     }
   };
+
+  // Credit-aware pagination and filter functions
+  const handlePageChangeWithCredit = async (page: number) => {
+    if (actionLoading) return;
+    
+    if (!hasEnoughCredits(creditCosts.CASE_LAW_SEARCH)) {
+      toast({
+        title: "Insufficient Credits",
+        description: "You need 1 credit to switch pages. Please add more credits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const success = await spendCredits(creditCosts.CASE_LAW_SEARCH, "Page navigation");
+      if (success) {
+        setCurrentPage(page);
+        toast({
+          title: "Credit Deducted",
+          description: "1 credit deducted for page navigation",
+        });
+      }
+    } catch (error) {
+      console.error('Error spending credits for page change:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process credit deduction",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleFilterChangeWithCredit = async (filterType: string, value: string) => {
+    if (actionLoading) return;
+    
+    if (!hasEnoughCredits(creditCosts.CASE_LAW_SEARCH)) {
+      toast({
+        title: "Insufficient Credits",
+        description: "You need 1 credit to change filters. Please add more credits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const success = await spendCredits(creditCosts.CASE_LAW_SEARCH, "Filter change");
+      if (success) {
+        // Show loading indicator for the search
+        setLoading(true);
+        
+        // First clear the cache to ensure we get fresh data
+        clearCache();
+        
+        // Reset pagination and current page
+        setCurrentPage(1);
+        setTotalPages(1); // Reset total pages to ensure UI updates immediately
+        
+        switch (filterType) {
+          case 'category':
+            setSelectedCategory(value);
+            break;
+          case 'court':
+            setSelectedCourt(value);
+            break;
+          case 'outcome':
+            setSelectedOutcome(value);
+            break;
+          case 'year':
+            setSelectedYear(value);
+            break;
+          case 'section':
+            setSelectedSection(value);
+            break;
+        }
+        
+        // Use setTimeout to ensure state updates are processed before fetching data
+        setTimeout(() => {
+          // Trigger a search with the new filter to update results
+          const formInput = getFormInputByCategory(filterType === 'category' ? value : selectedCategory);
+          searchCases(formInput);
+        }, 10);
+        
+        toast({
+          title: "Credit Deducted",
+          description: "1 credit deducted for filter change",
+        });
+      }
+    } catch (error) {
+      console.error('Error spending credits for filter change:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process credit deduction",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
   // Optimize client-side filtering with useCallback
   const filterCasesCallback = useCallback(() => {
     if (selectedCourt === "all" && selectedOutcome === "all") {
@@ -899,27 +1006,7 @@ export function CaseLawsDashboard() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <Select
                       value={selectedCategory}
-                      onValueChange={(value) => {
-                        // Show loading indicator
-                        setLoading(true);
-                        
-                        // First clear the cache to ensure we get fresh data
-                        clearCache();
-                        
-                        // Reset pagination and current page
-                        setCurrentPage(1);
-                        setTotalPages(1); // Reset total pages to ensure UI updates immediately
-                        
-                        // Update the selected category
-                        setSelectedCategory(value);
-                        
-                        // Use setTimeout to ensure state updates are processed before fetching data
-                        setTimeout(() => {
-                          // Trigger a search with the new category to update results
-                          const formInput = getFormInputByCategory(value);
-                          searchCases(formInput);
-                        }, 10);
-                      }}
+                      onValueChange={(value) => handleFilterChangeWithCredit('category', value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Category" />
@@ -939,7 +1026,7 @@ export function CaseLawsDashboard() {
 
                     <Select
                       value={selectedOutcome}
-                      onValueChange={setSelectedOutcome}
+                      onValueChange={(value) => handleFilterChangeWithCredit('outcome', value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Outcome" />
@@ -956,149 +1043,7 @@ export function CaseLawsDashboard() {
 
                     <Select
                       value={selectedSection}
-                      onValueChange={(value) => {
-                        // CRITICAL: Capture the selected value in local variable to prevent closure issues
-                        const selectedTaxSection = value;
-                        
-                        // Show loading indicator
-                        setLoading(true);
-                        
-                        // First clear the cache to ensure we get fresh data
-                        clearCache();
-                        
-                        // Reset pagination and current page
-                        setCurrentPage(1);
-                        setTotalPages(1); // Reset total pages to ensure UI updates immediately
-                        
-                        // Update the selected section
-                        setSelectedSection(selectedTaxSection);
-                        
-                        // Enhanced debugging
-                        console.log("🔍 Tax Section Filter Changed:");
-                        console.log(`   - Selected: ${selectedTaxSection}`);
-                        console.log(`   - Category: ${selectedCategory}`);
-                        console.log(`   - Year: ${selectedYear}`);
-                        
-                        // Directly make the API call with the new section filter
-                        // Don't wait for state updates to avoid timing issues
-                        const queryParams = new URLSearchParams({
-                          page: '1',
-                          limit: '20',
-                          sortBy: 'date',
-                          sortOrder: 'desc'
-                        });
-                        
-                        // Add necessary filters
-                        if (selectedCategory !== "all") {
-                          queryParams.append('category', selectedCategory);
-                        }
-                        
-                        if (selectedYear !== "all") {
-                          queryParams.append('year', selectedYear);
-                        }
-                        
-                        // IMPORTANT: Always use the local selectedTaxSection variable, not the state variable
-                        // Add the tax section filter if it's not "all"
-                        if (selectedTaxSection !== "all") {
-                          queryParams.append('taxSection', selectedTaxSection);
-                          console.log(`🔎 IMPORTANT: Filtering by taxSection=${selectedTaxSection}`);
-                          
-                          // Add visual indicator for debugging
-                          
-                        }
-                        
-                        // Execute the filtered fetch
-                        const apiUrl = `/api/case-laws?${queryParams.toString()}`;
-                        console.log(`📊 Making API request: ${apiUrl}`);
-                        
-                        fetch(apiUrl)
-                          .then(response => {
-                            if (!response.ok) {
-                              throw new Error(`API responded with status ${response.status}`);
-                            }
-                            return response.json();
-                          })
-                          .then(data => {
-                            if (data.success && Array.isArray(data.data)) {
-                              const resultCount = data.data.length;
-                              console.log(`✅ Received ${resultCount} cases with section ${selectedTaxSection}`);
-                              
-                              // No results warning
-                              if (resultCount === 0 && selectedTaxSection !== "all") {
-                              
-                                
-                                console.log(`⚠️ WARNING: No cases found with tax section ${selectedTaxSection}`);
-                                console.log("   This likely means no cases in your database have this tax section assigned.");
-                                console.log("   Run the enhanced-tax-sections.js script to analyze and assign tax sections.");
-                              }
-                              
-                              // Check if any of the results have the correct taxSection
-                              const withTaxSection = data.data.filter((item: any) => item.taxSection === selectedTaxSection);
-                              console.log(`📋 Cases with exact taxSection=${selectedTaxSection}: ${withTaxSection.length}/${data.data.length}`);
-                              
-                              // Show a sample of the returned data for debugging
-                              if (data.data.length > 0) {
-                                const sample = data.data[0];
-                                console.log("📝 Sample case:", {
-                                  id: sample.id, 
-                                  tid: sample.tid,
-                                  title: sample.title?.substring(0, 50),
-                                  taxSection: sample.taxSection,
-                                  category: sample.category
-                                });
-                              }
-                              
-                              // Map API results to our CaseData format
-                              const mappedCases = data.data.map((item: any) => {
-                                const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
-                                const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
-                                
-                                return {
-                                  id: item.id || item.tid?.toString(),
-                                  title: cleanTitle,
-                                  court: item.docsource ?? "Unknown",
-                                  date: item.publishdate ?? "",
-                                  bench: item.bench ?? "",
-                                  category: (item.category ? item.category.toString() : categorizeSource(item.docsource ?? "")) as "ITAT" | "GST" | "INCOME_TAX" | "HIGH_COURT" | "SUPREME_COURT" | "TRIBUNAL_COURT",
-                                  outcome: "allowed" as "allowed",
-                                  parties: {
-                                    appellant: "",
-                                    respondent: "",
-                                  },
-                                  caseNumber: `${item.tid}`,
-                                  summary: cleanHeadline,
-                                  relevantSections: [],
-                                  keywords: [],
-                                  legalPoints: [],
-                                  url: `https://indiankanoon.org/doc/${item.tid}`,
-                                  taxSection: item.taxSection || null,
-                                };
-                              });
-                              
-                              // Update the UI with filtered cases
-                              setCases(mappedCases);
-                              setFilteredCases(mappedCases);
-                              
-                              // Update pagination
-                              setTotalPages(Math.ceil(data.total / 20) || 1);
-                            } else {
-                              // Handle empty results
-                              setCases([]);
-                              setFilteredCases([]);
-                              console.log("No cases found with section:", selectedTaxSection);
-                            }
-                            setLoading(false);
-                          })
-                          .catch(error => {
-                            console.error("Error fetching filtered cases:", error);
-                            setLoading(false);
-                            toast({
-                              title: "Error",
-                              description: "Failed to load cases with the selected filter",
-                              variant: "destructive"
-                            });
-                          });
-                      }}
+                      onValueChange={(value) => handleFilterChangeWithCredit('section', value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Section" />
@@ -1138,27 +1083,7 @@ export function CaseLawsDashboard() {
 
                     <Select
                       value={selectedYear}
-                      onValueChange={(value) => {
-                        // Show loading indicator
-                        setLoading(true);
-                        
-                        // First clear the cache to ensure we get fresh data
-                        clearCache();
-                        
-                        // Reset pagination and current page
-                        setCurrentPage(1);
-                        setTotalPages(1); // Reset total pages to ensure UI updates immediately
-                        
-                        // Update the selected year
-                        setSelectedYear(value);
-                        
-                        // Use setTimeout to ensure state updates are processed before fetching data
-                        setTimeout(() => {
-                          // Trigger a search with the new year to update results
-                          const formInput = getFormInputByCategory(selectedCategory);
-                          searchCases(formInput);
-                        }, 10);
-                      }}
+                      onValueChange={(value) => handleFilterChangeWithCredit('year', value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Year" />
@@ -1432,11 +1357,59 @@ export function CaseLawsDashboard() {
                                       size="sm"
                                       variant="outline"
                                       className="h-8 px-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                      onClick={(e) => {
+                                      onClick={async (e) => {
                                         e.stopPropagation(); // prevent row toggle
-                                        router.push(
-                                          `/case-laws/${caseItem.caseNumber}`
-                                        ); // navigate to dynamic route
+                                        
+                                        // Check if this case was already viewed in this session
+                                        const viewedCasesKey = 'viewed-cases';
+                                        const viewedCases = JSON.parse(sessionStorage.getItem(viewedCasesKey) || '[]');
+                                        const caseId = caseItem.caseNumber;
+                                        
+                                        if (viewedCases.includes(caseId)) {
+                                          // Case already viewed, just navigate without charging
+                                          sessionStorage.setItem(`case-${caseId}-accessed`, 'true');
+                                          router.push(`/case-laws/${caseId}`);
+                                          return;
+                                        }
+                                        
+                                        // Check if user has enough credits
+                                        if (!hasEnoughCredits(creditCosts.DOCUMENT_VIEW)) {
+                                          toast({
+                                            title: "Insufficient Credits",
+                                            description: `You need ${creditCosts.DOCUMENT_VIEW} credits to view case details`,
+                                            variant: "destructive",
+                                          });
+                                          router.push("/profile");
+                                          return;
+                                        }
+
+                                        // Deduct credits for viewing case details
+                                        const success = await spendCredits(
+                                          creditCosts.DOCUMENT_VIEW,
+                                          `Case Details View: ${caseItem.title}`
+                                        );
+
+                                        if (success) {
+                                          // Mark case as viewed in this session
+                                          viewedCases.push(caseId);
+                                          sessionStorage.setItem(viewedCasesKey, JSON.stringify(viewedCases));
+                                          
+                                          // Set session flag to indicate credits were already deducted
+                                          sessionStorage.setItem(`case-${caseId}-accessed`, 'true');
+                                          
+                                          toast({
+                                            title: "Credits Deducted",
+                                            description: `${creditCosts.DOCUMENT_VIEW} credits deducted for viewing case details`,
+                                            variant: "default",
+                                          });
+                                          router.push(`/case-laws/${caseId}`);
+                                        } else {
+                                          toast({
+                                            title: "Error",
+                                            description: "Failed to process credits. Please try again.",
+                                            variant: "destructive",
+                                          });
+                                        }
                                       }}
                                     >
                                       <Eye className="h-4 w-4 mr-1" />
@@ -1527,24 +1500,55 @@ export function CaseLawsDashboard() {
                           <Button
                             variant="outline"
                             className="w-full border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                            onClick={() => {
-                              // Set the selected category
-                              setSelectedCategory(category);
+                            disabled={actionLoading}
+                            onClick={async () => {
+                              if (actionLoading) return;
                               
-                              // Switch to search tab
-                              setActiveTab("search");
-                              
-                              // Reset search query and other filters for clean search
-                              setSearchQuery("");
-                              setCurrentPage(1);
-                              
-                              // Optionally trigger a search with this category
-                              // This will help populate results immediately
-                              const formInput = getFormInputByCategory(category);
-                              searchCases(formInput);
+                              if (!hasEnoughCredits(creditCosts.CASE_LAW_SEARCH)) {
+                                toast({
+                                  title: "Insufficient Credits",
+                                  description: "You need 1 credit to browse cases. Please add more credits.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              setActionLoading(true);
+                              try {
+                                const success = await spendCredits(creditCosts.CASE_LAW_SEARCH, "Browse category");
+                                if (success) {
+                                  // Set the selected category
+                                  setSelectedCategory(category);
+                                  
+                                  // Switch to search tab
+                                  setActiveTab("search");
+                                  
+                                  // Reset search query and other filters for clean search
+                                  setSearchQuery("");
+                                  setCurrentPage(1);
+                                  
+                                  // Trigger a search with this category
+                                  const formInput = getFormInputByCategory(category);
+                                  searchCases(formInput);
+                                  
+                                  toast({
+                                    title: "Credit Deducted",
+                                    description: "1 credit deducted for browsing cases",
+                                  });
+                                }
+                              } catch (error) {
+                                console.error('Error spending credits for category browse:', error);
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to process credit deduction",
+                                  variant: "destructive",
+                                });
+                              } finally {
+                                setActionLoading(false);
+                              }
                             }}
                           >
-                            Browse Cases
+                            {actionLoading ? "Loading..." : "Browse Cases"}
                           </Button>
                         </div>
                       </CardContent>
@@ -1681,19 +1685,20 @@ export function CaseLawsDashboard() {
         <nav className="inline-flex items-center space-x-1">
           {/* Previous Button */}
           <button
-            onClick={handlePreviousPage}
+            onClick={() => handlePageChangeWithCredit(Math.max(currentPage - 1, 1))}
             className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-            disabled={currentPage === 1}
+            disabled={currentPage === 1 || actionLoading}
           >
-            Previous
+            {actionLoading ? "Loading..." : "Previous"}
           </button>
           
           {/* First Page */}
           {currentPage > 3 && (
             <>
               <button
-                onClick={() => handlePageChange(1)}
+                onClick={() => handlePageChangeWithCredit(1)}
                 className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                disabled={actionLoading}
               >
                 1
               </button>
@@ -1725,12 +1730,13 @@ export function CaseLawsDashboard() {
               return (
                 <button
                   key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
+                  onClick={() => handlePageChangeWithCredit(pageNum)}
                   className={`px-3 py-1 border rounded transition-colors ${
                     pageNum === currentPage 
                       ? "bg-blue-700 dark:bg-blue-600 text-white font-semibold border-blue-700 dark:border-blue-600" 
                       : "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  }`}
+                  } ${actionLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  disabled={actionLoading}
                 >
                   {pageNum}
                 </button>
@@ -1746,8 +1752,9 @@ export function CaseLawsDashboard() {
                 <span className="px-2 text-gray-500 dark:text-gray-400">...</span>
               )}
               <button
-                onClick={() => handlePageChange(totalPages)}
+                onClick={() => handlePageChangeWithCredit(totalPages)}
                 className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                disabled={actionLoading}
               >
                 {totalPages}
               </button>
@@ -1756,13 +1763,13 @@ export function CaseLawsDashboard() {
           
           {/* Next Button */}
           <button
-            onClick={handleNextPage}
+            onClick={() => handlePageChangeWithCredit(Math.min(currentPage + 1, totalPages))}
             className={`px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors ${
               currentPage >= totalPages ? "opacity-50 cursor-not-allowed" : ""
             }`}
-            disabled={currentPage >= totalPages}
+            disabled={currentPage >= totalPages || actionLoading}
           >
-            Next
+            {actionLoading ? "Loading..." : "Next"}
           </button>
         </nav>
       </div>
