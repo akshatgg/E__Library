@@ -317,12 +317,12 @@ export default function CasePage({ params }: { params: { tid: string } }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <div className="flex flex-col items-center">
-            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-            <h2 className="text-xl font-medium text-gray-700">Loading Case Details</h2>
-            <p className="text-gray-500 mt-2">Please wait while we retrieve the case information...</p>
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 dark:text-blue-400 mb-4" />
+            <h2 className="text-xl font-medium text-gray-700 dark:text-gray-200">Loading Case Details</h2>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">Please wait while we retrieve the case information...</p>
           </div>
         </div>
       </div>
@@ -331,13 +331,13 @@ export default function CasePage({ params }: { params: { tid: string } }) {
 
   if (error || !caseData?.success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
-          <div className="text-red-600 text-6xl mb-4">⚠</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <div className="text-red-600 dark:text-red-400 text-6xl mb-4">⚠</div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Error Loading Case
           </h2>
-          <p className="text-gray-600">{error || "Case data not found"}</p>
+          <p className="text-gray-600 dark:text-gray-400">{error || "Case data not found"}</p>
         </div>
       </div>
     );
@@ -347,16 +347,16 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const cleanedContent = cleanHtmlContent(caseData.data.doc);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="mb-4">
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => router.back()}
-              className="flex items-center text-gray-600 hover:text-gray-900"
+              className="flex items-center text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <ArrowLeft className="mr-1 h-4 w-4" />
               Back to Results
@@ -364,30 +364,30 @@ export default function CasePage({ params }: { params: { tid: string } }) {
           </div>
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 {caseData.data.title}
               </h1>
-              <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+              <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
                 <span className="flex items-center">
-                  <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
+                  <span className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full mr-2"></span>
                   TID: {caseData.data.tid}
                 </span>
                 <span className="flex items-center">
-                  <span className="w-2 h-2 bg-green-600 rounded-full mr-2"></span>
+                  <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full mr-2"></span>
                   Published: {formatDate(caseData.data.publishdate)}
                 </span>
                 <span className="flex items-center">
-                  <span className="w-2 h-2 bg-purple-600 rounded-full mr-2"></span>
+                  <span className="w-2 h-2 bg-purple-600 dark:bg-purple-400 rounded-full mr-2"></span>
                   Source: {caseData.data.docsource}
                 </span>
               </div>
             </div>
             <div className="flex flex-col items-end space-y-2">
-              <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+              <div className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm font-medium">
                 {caseData.data.divtype}
               </div>
               {caseData.data.courtcopy && (
-                <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                <div className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm font-medium">
                   Court Copy
                 </div>
               )}
@@ -397,39 +397,39 @@ export default function CasePage({ params }: { params: { tid: string } }) {
       </div>
 
       {/* Stats Bar */}
-      <div className="bg-white border-b">
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {caseData.data.numcites}
               </div>
-              <div className="text-sm text-gray-600">Citations</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Citations</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {caseData.data.numcitedby}
               </div>
-              <div className="text-sm text-gray-600">Cited By</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Cited By</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {new Date(caseData.data.publishdate).getFullYear().toString() || "N/A"}
               </div>
-              <div className="text-sm text-gray-600">Assessment Year</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Assessment Year</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {caseInfo.caseNumber || "N/A"}
               </div>
-              <div className="text-sm text-gray-600">Case Number</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Case Number</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="bg-white border-b">
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8">
             {[
@@ -440,10 +440,10 @@ export default function CasePage({ params }: { params: { tid: string } }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
               >
                 {tab.label}
@@ -459,100 +459,100 @@ export default function CasePage({ params }: { params: { tid: string } }) {
           <div className="space-y-6">
             {/* Case Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Case Information
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Parties:
                     </span>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
                       {caseInfo.parties || "Not specified"}
                     </p>
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Assessment Year:
                     </span>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
                       {new Date(caseData.data.publishdate).getFullYear().toString()}
                     </p>
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Case Number:
                     </span>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
                       {caseInfo.caseNumber || "Not specified"}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Important Dates
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Published:
                     </span>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
                       {formatDate(caseData.data.publishdate)}
                     </p>
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Hearing Date:
                     </span>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
                       {caseInfo.hearingDate || "Not specified"}
                     </p>
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Pronouncement:
                     </span>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
                       {caseInfo.pronouncementDate || "Not specified"}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Citation Metrics
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Total Citations:
                     </span>
-                    <span className="text-sm font-bold text-blue-600">
+                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
                       {caseData.data.numcites}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Cited By Others:
                     </span>
-                    <span className="text-sm font-bold text-green-600">
+                    <span className="text-sm font-bold text-green-600 dark:text-green-400">
                       {caseData.data.numcitedby}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-500">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       Court Copy:
                     </span>
                     <span
                       className={`text-sm font-bold ${
                         caseData.data.courtcopy
-                          ? "text-green-600"
-                          : "text-gray-400"
+                          ? "text-green-600 dark:text-green-400"
+                          : "text-gray-400 dark:text-gray-500"
                       }`}
                     >
                       {caseData.data.courtcopy ? "Yes" : "No"}
@@ -563,24 +563,24 @@ export default function CasePage({ params }: { params: { tid: string } }) {
             </div>
 
             {/* Source Information */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Source & Classification
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <span className="text-sm font-medium text-gray-500">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                     Document Source:
                   </span>
-                  <p className="text-sm text-gray-900 mt-1">
+                  <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
                     {caseData.data.docsource}
                   </p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-500">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                     Document Type:
                   </span>
-                  <p className="text-sm text-gray-900 mt-1 capitalize">
+                  <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 capitalize">
                     {caseData.data.divtype}
                   </p>
                 </div>
@@ -590,34 +590,34 @@ export default function CasePage({ params }: { params: { tid: string } }) {
         )}
 
         {activeTab === "details" && (
-          <div className="bg-white rounded-lg shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Case Details Summary
               </h3>
               <div className="prose max-w-none">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">Case Title:</h4>
-                  <p className="text-gray-700">{caseData.data.title}</p>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Case Title:</h4>
+                  <p className="text-gray-700 dark:text-gray-300">{caseData.data.title}</p>
                 </div>
 
                 {caseInfo.parties && (
-                  <div className="bg-blue-50 p-4 rounded-lg mt-4">
-                    <h4 className="font-semibold mb-2">Parties Involved:</h4>
-                    <p className="text-gray-700">{caseInfo.parties}</p>
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg mt-4 border border-blue-200 dark:border-blue-700">
+                    <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Parties Involved:</h4>
+                    <p className="text-gray-700 dark:text-gray-300">{caseInfo.parties}</p>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <h4 className="font-semibold mb-2">Assessment Year:</h4>
-                    <p className="text-gray-700">{new Date(caseData.data.publishdate).getFullYear().toString()}</p>
+                  <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-green-700">
+                    <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Assessment Year:</h4>
+                    <p className="text-gray-700 dark:text-gray-300">{new Date(caseData.data.publishdate).getFullYear().toString()}</p>
                   </div>
 
                   {caseInfo.caseNumber && (
-                    <div className="bg-purple-50 p-4 rounded-lg">
-                      <h4 className="font-semibold mb-2">Case Number:</h4>
-                      <p className="text-gray-700">{caseInfo.caseNumber}</p>
+                    <div className="bg-purple-50 dark:bg-purple-900/30 p-4 rounded-lg border border-purple-200 dark:border-purple-700">
+                      <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Case Number:</h4>
+                      <p className="text-gray-700 dark:text-gray-300">{caseInfo.caseNumber}</p>
                     </div>
                   )}
                 </div>
@@ -627,38 +627,44 @@ export default function CasePage({ params }: { params: { tid: string } }) {
         )}
 
         {activeTab === "judgment" && (
-          <div className="bg-white rounded-lg shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Full Judgment Text
                 </h3>
-                <Button onClick={handleDownloadJudgmentPDF} className="ml-4">
+                <Button 
+                  onClick={handleDownloadJudgmentPDF} 
+                  className="ml-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
+                >
                   Download PDF
                 </Button>
               </div>
-              <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-700 mb-2">Case Information</h4>
+              <div className="mb-6 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                <h4 className="font-medium text-gray-700 dark:text-gray-200 mb-2">Case Information</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <span className="font-medium">Title:</span> {caseData.data.title}
+                    <span className="font-medium text-gray-600 dark:text-gray-300">Title:</span> 
+                    <span className="text-gray-900 dark:text-gray-100 ml-1">{caseData.data.title}</span>
                   </div>
                   <div>
-                    <span className="font-medium">Date:</span> {formatDate(caseData.data.publishdate)}
+                    <span className="font-medium text-gray-600 dark:text-gray-300">Date:</span> 
+                    <span className="text-gray-900 dark:text-gray-100 ml-1">{formatDate(caseData.data.publishdate)}</span>
                   </div>
                   <div>
-                    <span className="font-medium">Source:</span> {caseData.data.docsource}
+                    <span className="font-medium text-gray-600 dark:text-gray-300">Source:</span> 
+                    <span className="text-gray-900 dark:text-gray-100 ml-1">{caseData.data.docsource}</span>
                   </div>
                 </div>
               </div>
-              <div className="border-t border-gray-200 pt-6">
+              <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
                 <div 
-                  className="prose prose-headings:font-semibold prose-headings:text-gray-800 
-                             prose-p:text-justify prose-p:my-4 max-w-none text-sm leading-relaxed"
+                  className="prose prose-headings:font-semibold prose-headings:text-gray-800 dark:prose-headings:text-gray-200
+                             prose-p:text-justify prose-p:my-4 max-w-none text-sm leading-relaxed 
+                             text-gray-900 dark:text-gray-100"
                   style={{
                     fontFamily: "Georgia, serif",
                     lineHeight: "1.8",
-                    color: "#333",
                     maxHeight: showFullJudgment ? "none" : "500px",
                     overflow: "hidden",
                     position: "relative"
@@ -667,10 +673,7 @@ export default function CasePage({ params }: { params: { tid: string } }) {
                   <div dangerouslySetInnerHTML={{ __html: cleanedContent }} />
                   {!showFullJudgment && (
                     <div 
-                      className="absolute bottom-0 left-0 right-0 h-24" 
-                      style={{ 
-                        background: "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)" 
-                      }}
+                      className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-gray-800 to-transparent pointer-events-none"
                     />
                   )}
                 </div>
@@ -678,7 +681,7 @@ export default function CasePage({ params }: { params: { tid: string } }) {
                   <Button 
                     variant="outline"
                     onClick={() => setShowFullJudgment(!showFullJudgment)} 
-                    className="mx-auto flex items-center gap-2"
+                    className="mx-auto flex items-center gap-2 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                   >
                     {showFullJudgment ? (
                       <>

@@ -70,18 +70,13 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-4">Resources</h4>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <Link href="/case-laws/categories" className="hover:text-white transition-colors">
-                  Case Categories
-                </Link>
-              </li>
-              <li>
-                <Link href="/library" className="hover:text-white transition-colors">
-                  Document Templates
-                </Link>
-              </li>
-              <li>
                 <Link href="/contact" className="hover:text-white transition-colors">
                   Support
+                </Link>
+              </li>
+               <li>
+                <Link href="/profile" className="hover:text-white transition-colors">
+                  Profile
                 </Link>
               </li>
             </ul>

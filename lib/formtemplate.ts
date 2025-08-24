@@ -1,19 +1,707 @@
 // formTemplates.ts
-// This file contains all the form templates for different departmental letters
+// This file contains all the official form templates for different departmental letters
 
 export interface FormData {
-  // Basic Information
-  partyName?: string;
-  fatherName?: string;
-  address?: string;
-  panNumber?: string;
-  gstNumber?: string;
-  email?: string;
-  partnerName?: string;
-  firmName?: string;
-  assYear?: string;
-  place?: string;
-  currentDate?: string;
+  [key: string]: string | undefined;
+}
+
+export interface FormTemplate {
+  title: string;
+  generateContent: (data: FormData) => string;
+}
+
+export interface GeneratedForm {
+  title: string;
+  content: string;
+}
+
+export const formTemplates: Record<string, FormTemplate> = {
+  // ============= TAX CATEGORY TEMPLATES =============
+  
+  'Income Tax Refund Application': {
+    title: 'APPLICATION FOR INCOME TAX REFUND',
+    generateContent: (data: FormData) => `To,
+The Assessing Officer
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+${data.place || 'New Delhi'}
+
+Subject: Application for Refund of Excess Income Tax Paid for A.Y. ${data.assYear || '2024-25'}
+
+Respected Sir/Madam,
+
+I, ${data.partyName || '_____________'}, holding PAN ${data.panNumber || '__________'}, respectfully submit this application for refund of excess income tax paid for Assessment Year ${data.assYear || '2024-25'}.
+
+DETAILS:
+1. Name of Assessee: ${data.partyName || '_____________'}
+2. PAN: ${data.panNumber || '__________'}
+3. Assessment Year: ${data.assYear || '2024-25'}
+4. Address: ${data.address || '_____________'}
+
+GROUNDS FOR REFUND:
+As per my computation and the provisions of Income Tax Act, 1961, I have paid excess tax of Rs. ${data.refundAmount || '_______'} during the financial year.
+
+BANK DETAILS FOR REFUND:
+Bank Name: ${data.bankName || '_____________'}
+Account Number: ${data.accountNumber || '_____________'}
+IFSC Code: ${data.ifscCode || '_____________'}
+
+I request you to kindly process my refund claim and credit the amount to the above bank account.
+
+Yours faithfully,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}
+
+Enclosures:
+1. Copy of ITR Filed
+2. Copy of Form 26AS
+3. Proof of Tax Payments
+4. Bank Account Details`
+  },
+
+  'Excess Payment Refund': {
+    title: 'APPLICATION FOR EXCESS PAYMENT REFUND',
+    generateContent: (data: FormData) => `To,
+The Income Tax Officer
+Ward No: ${data.wardNumber || '_____'}
+${data.place || 'New Delhi'}
+
+Subject: Refund of Excess Payment made for A.Y. ${data.assYear || '2024-25'}
+
+Sir/Madam,
+
+I am ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, and I am writing to request a refund of excess payment made towards income tax.
+
+PAYMENT DETAILS:
+- Assessment Year: ${data.assYear || '2024-25'}
+- Excess Payment: Rs. ${data.excessAmount || data.refundAmount || '_______'}
+
+The excess payment was made inadvertently while filing advance tax/self-assessment tax. I request you to process the refund and credit to my bank account.
+
+Bank Details:
+Name: ${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+Thanking you,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Tax Credit Refund': {
+    title: 'APPLICATION FOR TAX CREDIT REFUND',
+    generateContent: (data: FormData) => `To,
+The Assessing Officer
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+
+Subject: Refund of Tax Credit for A.Y. ${data.assYear || '2024-25'}
+
+Respected Sir/Madam,
+
+I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, request refund of tax credit as per details below:
+
+TAX CREDIT DETAILS:
+1. Relief under Section 89: Rs. ${data.relief89 || '_______'}
+2. Foreign Tax Credit: Rs. ${data.foreignTaxCredit || '_______'}
+
+Total Credit Eligible for Refund: Rs. ${data.totalCredit || data.refundAmount || '_______'}
+
+I have filed my return for A.Y. ${data.assYear || '2024-25'} and the above credits are available for refund.
+
+Kindly process the refund to my bank account:
+${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+Yours sincerely,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Advance Tax Refund': {
+    title: 'APPLICATION FOR ADVANCE TAX REFUND',
+    generateContent: (data: FormData) => `To,
+The Income Tax Officer
+Ward No: ${data.wardNumber || '_____'}
+Income Tax Department
+
+Subject: Refund of Excess Advance Tax Paid for A.Y. ${data.assYear || '2024-25'}
+
+Sir/Madam,
+
+I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, have paid excess advance tax for Assessment Year ${data.assYear || '2024-25'}.
+
+ADVANCE TAX PAYMENT DETAILS:
+Total Advance Tax Paid: Rs. ${data.totalAdvanceTax || data.refundAmount || '_______'}
+Excess Payment: Rs. ${data.excessAdvanceTax || data.refundAmount || '_______'}
+
+The excess payment occurred due to changes in income during the year. I request refund of the excess amount.
+
+Bank Details for Refund:
+Bank: ${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+Thanking you,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= TDS CATEGORY TEMPLATES =============
+  
+  'TDS Return Filing (24Q)': {
+    title: 'TDS RETURN FORM 24Q - QUARTERLY RETURN',
+    generateContent: (data: FormData) => `FORM 24Q
+QUARTERLY RETURN OF TAX DEDUCTED AT SOURCE ON SALARIES
+
+Deductor Details:
+Name: ${data.deductorName || data.firmName || '_____________'}
+TAN: ${data.tanNumber || '__________'}
+PAN: ${data.panNumber || '__________'}
+Address: ${data.address || '_____________'}
+
+Return Details:
+Quarter: ${data.quarter || 'Q4'}
+Financial Year: ${data.financialYear || '2024-25'}
+
+Summary of TDS:
+Total No. of Employees: ${data.totalEmployees || '_______'}
+Total Salary Paid: Rs. ${data.totalSalary || '_______'}
+Total TDS Deducted: Rs. ${data.totalTDS || data.tdsAmount || '_______'}
+
+DECLARATION:
+I, ${data.authorizedPerson || data.partyName || '_____________'}, declare that the information given above is true and correct.
+
+Signature: _______________
+Name: ${data.authorizedPerson || data.partyName || '_____________'}
+Designation: ${data.designation || 'Authorized Signatory'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'TDS Return Filing (26Q)': {
+    title: 'TDS RETURN FORM 26Q - OTHER THAN SALARY',
+    generateContent: (data: FormData) => `FORM 26Q
+QUARTERLY RETURN OF TAX DEDUCTED AT SOURCE (OTHER THAN SALARY)
+
+Deductor Details:
+Name: ${data.deductorName || data.firmName || '_____________'}
+TAN: ${data.tanNumber || '__________'}
+PAN: ${data.panNumber || '__________'}
+Address: ${data.address || '_____________'}
+
+Return Details:
+Quarter: ${data.quarter || 'Q4'}
+Financial Year: ${data.financialYear || '2024-25'}
+
+Summary of TDS:
+Total Deductees: ${data.totalDeductees || '_______'}
+Total Amount Paid: Rs. ${data.totalAmountPaid || '_______'}
+Total TDS Deducted: Rs. ${data.totalTDS || data.tdsAmount || '_______'}
+
+Nature of Payments:
+1. Professional Fees (194J): Rs. ${data.professionalFees || '_______'}
+2. Commission (194H): Rs. ${data.commission || '_______'}
+3. Rent (194I): Rs. ${data.rent || '_______'}
+
+DECLARATION:
+I declare that the information given above is true and correct.
+
+${data.authorizedPerson || data.partyName || '_____________'}
+Designation: ${data.designation || 'Authorized Signatory'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Form 16 Generation': {
+    title: 'FORM 16 - CERTIFICATE OF DEDUCTION OF TAX FROM SALARY',
+    generateContent: (data: FormData) => `FORM 16
+Certificate of deduction of tax from salary
+
+EMPLOYER DETAILS:
+Name: ${data.employerName || data.firmName || '_____________'}
+Address: ${data.employerAddress || data.address || '_____________'}
+TAN: ${data.tanNumber || '__________'}
+PAN: ${data.employerPAN || data.panNumber || '__________'}
+
+EMPLOYEE DETAILS:
+Name: ${data.employeeName || data.partyName || '_____________'}
+PAN: ${data.employeePAN || data.panNumber || '__________'}
+Employee Code: ${data.employeeCode || '_______'}
+Address: ${data.employeeAddress || data.address || '_____________'}
+
+Period: From ${data.periodFrom || '01/04/2024'} To ${data.periodTo || '31/03/2025'}
+Assessment Year: ${data.assYear || '2025-26'}
+
+SALARY DETAILS:
+Gross Salary: Rs. ${data.grossSalary || '_______'}
+Less: Allowances exempt: Rs. ${data.exemptAllowances || '_______'}
+Balance: Rs. ${data.balanceIncome || '_______'}
+
+DEDUCTIONS:
+Section 80C: Rs. ${data.sec80C || '_______'}
+Section 80D: Rs. ${data.sec80D || '_______'}
+Total Deductions: Rs. ${data.totalDeductions || '_______'}
+
+TAX COMPUTATION:
+Total Income: Rs. ${data.totalIncome || '_______'}
+Tax on Income: Rs. ${data.taxOnIncome || '_______'}
+Education Cess: Rs. ${data.educationCess || '_______'}
+Total Tax: Rs. ${data.totalTaxPayable || '_______'}
+TDS Deducted: Rs. ${data.totalTDS || data.tdsAmount || '_______'}
+
+This is to certify that tax deducted has been paid to the Central Government.
+
+${data.authorizedSignatory || '_____________'}
+Designation: ${data.designation || 'HR Manager'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'TDS Refund Application': {
+    title: 'APPLICATION FOR TDS REFUND',
+    generateContent: (data: FormData) => `To,
+The Income Tax Officer
+TDS Circle
+${data.place || 'New Delhi'}
+
+Subject: Refund of Excess TDS Deducted for F.Y. ${data.financialYear || '2024-25'}
+
+Respected Sir/Madam,
+
+I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, request refund of excess TDS deducted.
+
+TDS DETAILS:
+Total TDS Deducted: Rs. ${data.totalTDSDeducted || data.tdsAmount || '_______'}
+Actual Tax Liability: Rs. ${data.actualTaxLiability || '_______'}
+Excess TDS: Rs. ${data.excessTDS || data.refundAmount || '_______'}
+
+DEDUCTOR DETAILS:
+Name: ${data.deductorName || data.firmName || '_______'}
+TAN: ${data.deductorTAN || '_______'}
+
+I have filed my ITR and the excess TDS is available for refund.
+
+Bank Details:
+Bank: ${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+Yours faithfully,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= SERVE CATEGORY TEMPLATES =============
+  
+  'Income Tax Notice Reply': {
+    title: 'REPLY TO INCOME TAX NOTICE',
+    generateContent: (data: FormData) => `To,
+${data.assessingOfficer || 'The Assessing Officer'}
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+${data.place || 'New Delhi'}
+
+Subject: Reply to Notice under Section ${data.noticeSection || '143(2)'} dated ${data.noticeDate || '_______'}
+
+Respected Sir/Madam,
+
+With reference to your notice dated ${data.noticeDate || '_______'}, I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, submit my reply as follows:
+
+ASSESSEE DETAILS:
+Name: ${data.partyName || '_____________'}
+PAN: ${data.panNumber || '__________'}
+Assessment Year: ${data.assYear || '2024-25'}
+Address: ${data.address || '_____________'}
+
+REPLY TO QUERIES:
+1. The income has been properly disclosed in the return filed.
+2. All investments are made from disclosed sources of income.
+3. All expenses are genuine and supported by proper vouchers.
+
+DOCUMENTS ENCLOSED:
+1. Copy of Books of Accounts
+2. Bank Statements
+3. Investment Proofs
+4. Bills and Vouchers
+
+I submit that the return filed is correct and complete. I request you to kindly consider the submission and close the case.
+
+Thanking you,
+Yours faithfully,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Personal Hearing Request': {
+    title: 'APPLICATION FOR PERSONAL HEARING',
+    generateContent: (data: FormData) => `To,
+${data.assessingOfficer || 'The Assessing Officer'}
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+${data.place || 'New Delhi'}
+
+Subject: Request for Personal Hearing for A.Y. ${data.assYear || '2024-25'}
+
+Respected Sir/Madam,
+
+I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, request for a personal hearing in connection with assessment proceedings for Assessment Year ${data.assYear || '2024-25'}.
+
+CASE DETAILS:
+Case ID: ${data.caseId || '_______'}
+Notice Date: ${data.noticeDate || '_______'}
+
+GROUNDS FOR HEARING:
+1. To explain the facts and circumstances of the case
+2. To present additional evidence
+3. To clarify doubts regarding income computation
+
+I request you to kindly grant me a hearing at your convenience.
+
+Thanking you,
+Yours faithfully,
+
+${data.partyName || '_____________'}
+Contact: ${data.phone || '_______'}
+Email: ${data.email || '_______'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Assessment Notice Response': {
+    title: 'RESPONSE TO ASSESSMENT NOTICE',
+    generateContent: (data: FormData) => `To,
+${data.assessingOfficer || 'The Assessing Officer'}
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+
+Subject: Response to Assessment Notice for A.Y. ${data.assYear || '2024-25'}
+
+Respected Sir/Madam,
+
+In response to your assessment notice dated ${data.noticeDate || '_______'}, I submit the following:
+
+ASSESSMENT DETAILS:
+Assessee: ${data.partyName || '_____________'}
+PAN: ${data.panNumber || '__________'}
+Assessment Year: ${data.assYear || '2024-25'}
+
+INCOME COMPUTATION:
+Total Income as per Return: Rs. ${data.returnedIncome || '_______'}
+Additions proposed: Rs. ${data.proposedAdditions || '_______'}
+Our Submission: The additions are not justified as the income is correctly computed.
+
+SUPPORTING DOCUMENTS:
+All relevant documents are enclosed herewith.
+
+I request you to accept the return as filed.
+
+Yours faithfully,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= VAL CATEGORY TEMPLATES =============
+  
+  'Property Valuation Report': {
+    title: 'PROPERTY VALUATION REPORT',
+    generateContent: (data: FormData) => `PROPERTY VALUATION REPORT
+
+CLIENT DETAILS:
+Name: ${data.clientName || data.partyName || '_____________'}
+Address: ${data.clientAddress || data.address || '_____________'}
+PAN: ${data.panNumber || '__________'}
+
+PROPERTY DETAILS:
+Property Type: ${data.propertyType || 'Residential'}
+Property Address: ${data.propertyAddress || data.address || '_____________'}
+Area: ${data.area || '_______'} sq.ft.
+Built-up Area: ${data.builtupArea || '_______'} sq.ft.
+
+VALUATION DETAILS:
+Date of Valuation: ${data.valuationDate || data.currentDate || new Date().toLocaleDateString()}
+Purpose: ${data.valuationPurpose || 'Tax Assessment'}
+Method: ${data.valuationMethod || 'Comparable Sales Method'}
+
+VALUATION:
+Land Value: Rs. ${data.landValue || '_______'}
+Building Value: Rs. ${data.buildingValue || '_______'}
+Total Market Value: Rs. ${data.totalValue || '_______'}
+
+CERTIFICATE:
+I certify that the above valuation represents the fair market value of the property.
+
+${data.valuatorName || '_____________'}
+Registered Valuer
+Registration No: ${data.valuatorRegNo || '_______'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Company Valuation': {
+    title: 'COMPANY VALUATION REPORT',
+    generateContent: (data: FormData) => `COMPANY VALUATION REPORT
+
+COMPANY DETAILS:
+Name: ${data.companyName || data.firmName || '_____________'}
+CIN: ${data.cin || '_______'}
+PAN: ${data.panNumber || '__________'}
+Address: ${data.address || '_____________'}
+
+VALUATION DETAILS:
+Valuation Date: ${data.valuationDate || data.currentDate}
+Purpose: ${data.purpose || 'Income Tax Assessment'}
+Method: ${data.method || 'DCF Method'}
+
+FINANCIAL HIGHLIGHTS:
+Revenue: Rs. ${data.revenue || '_______'} Lakhs
+Net Profit: Rs. ${data.netProfit || '_______'} Lakhs
+Total Assets: Rs. ${data.totalAssets || '_______'} Lakhs
+Net Worth: Rs. ${data.netWorth || '_______'} Lakhs
+
+VALUATION SUMMARY:
+Fair Value per Share: Rs. ${data.valuePerShare || '_______'}
+Total Company Value: Rs. ${data.totalCompanyValue || '_______'} Lakhs
+
+${data.valuatorName || 'Certified Valuer'}
+Registration No: ${data.valuatorRegNo || '_______'}
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= ROC CATEGORY TEMPLATES =============
+  
+  'Annual Return Filing': {
+    title: 'FORM MGT-7 - ANNUAL RETURN',
+    generateContent: (data: FormData) => `FORM MGT-7
+ANNUAL RETURN
+
+COMPANY DETAILS:
+1. CIN: ${data.cin || '_______'}
+2. Company Name: ${data.companyName || data.firmName || '_____________'}
+3. Address: ${data.registeredOffice || data.address || '_____________'}
+4. Email: ${data.companyEmail || data.email || '_______'}
+
+FINANCIAL YEAR: From ${data.fyFrom || '01/04/2024'} To ${data.fyTo || '31/03/2025'}
+
+PRINCIPAL BUSINESS ACTIVITIES:
+1. ${data.businessActivity1 || 'Trading and Commerce'}
+
+SHARE CAPITAL:
+Authorized Capital: Rs. ${data.authorizedCapital || '_______'}
+Paid-up Capital: Rs. ${data.paidupCapital || '_______'}
+
+DIRECTORS:
+1. Name: ${data.director1 || '_______'} DIN: ${data.din1 || '_______'}
+
+MEETINGS:
+Board Meetings Held: ${data.boardMeetings || '_______'}
+AGM Date: ${data.agmDate || '_______'}
+
+For ${data.companyName || data.firmName || '_____________'}
+
+${data.directorName || data.partyName || '_____________'}
+Director
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  'Company Registration': {
+    title: 'APPLICATION FOR COMPANY REGISTRATION',
+    generateContent: (data: FormData) => `APPLICATION FOR INCORPORATION OF COMPANY
+
+COMPANY DETAILS:
+Proposed Name: ${data.companyName || data.firmName || '_____________'}
+Class of Company: ${data.companyClass || 'Private Limited'}
+Category: ${data.companyCategory || 'Company Limited by Shares'}
+
+REGISTERED OFFICE:
+Address: ${data.registeredOffice || data.address || '_____________'}
+State: ${data.state || '_______'}
+Pin Code: ${data.pincode || '_______'}
+
+AUTHORIZED CAPITAL: Rs. ${data.authorizedCapital || '_______'}
+
+DIRECTORS:
+1. Name: ${data.director1 || data.partyName || '_______'}
+   DIN: ${data.din1 || '_______'}
+   PAN: ${data.directorPAN1 || data.panNumber || '_______'}
+
+SUBSCRIBERS:
+1. ${data.subscriber1 || data.partyName || '_______'} - Shares: ${data.shares1 || '_______'}
+
+OBJECTS:
+Main Object: ${data.mainObject || 'To carry on business of trading'}
+
+DECLARATION:
+We declare that all requirements of Companies Act, 2013 have been complied with.
+
+${data.director1 || data.partyName || '_____________'}
+First Director
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= GST CATEGORY TEMPLATES =============
+  
+  'New GST Registration': {
+    title: 'APPLICATION FOR GST REGISTRATION',
+    generateContent: (data: FormData) => `APPLICATION FOR REGISTRATION UNDER GST
+FORM GST REG-01
+
+APPLICANT DETAILS:
+1. Legal Name: ${data.legalName || data.partyName || '_____________'}
+2. Trade Name: ${data.tradeName || data.firmName || '_____________'}
+3. PAN: ${data.panNumber || '__________'}
+4. Constitution: ${data.constitution || 'Proprietorship'}
+
+BUSINESS DETAILS:
+Principal Place of Business:
+${data.principalAddress || data.address || '_____________'}
+Pin Code: ${data.pincode || '_______'}
+State: ${data.state || '_______'}
+
+Nature of Business: ${data.businessNature || 'Trading'}
+Commencement Date: ${data.commencementDate || '_______'}
+Reason for Registration: ${data.registrationReason || 'Aggregate turnover exceeded threshold'}
+
+BANK DETAILS:
+Bank Name: ${data.bankName || '_____________'}
+Account Number: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+PROMOTER DETAILS:
+Name: ${data.partnerName || data.partyName || '_____________'}
+PAN: ${data.partnerPAN || data.panNumber || '__________'}
+Mobile: ${data.mobile || '_______'}
+Email: ${data.email || '_______'}
+
+DECLARATION:
+I declare that the information given above is true and correct.
+
+${data.authorizedSignatory || data.partyName || '_____________'}
+Designation: ${data.designation || 'Proprietor'}
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  'GSTR-1 Filing': {
+    title: 'FORM GSTR-1 - OUTWARD SUPPLIES',
+    generateContent: (data: FormData) => `FORM GSTR-1
+DETAILS OF OUTWARD SUPPLIES
+
+GSTIN: ${data.gstin || data.gstNumber || '_____________'}
+Legal Name: ${data.legalName || data.partyName || '_____________'}
+Trade Name: ${data.tradeName || data.firmName || '_____________'}
+Period: ${data.period || 'March 2025'}
+
+B2B SUPPLIES:
+Total Value: Rs. ${data.b2bValue || '_______'}
+Taxable Value: Rs. ${data.b2bTaxable || '_______'}
+IGST: Rs. ${data.igst || '_______'}
+CGST: Rs. ${data.cgst || '_______'}
+SGST: Rs. ${data.sgst || '_______'}
+
+B2C SUPPLIES:
+Total Value: Rs. ${data.b2cValue || '_______'}
+Taxable Value: Rs. ${data.b2cTaxable || '_______'}
+
+EXPORTS:
+Export Value: Rs. ${data.exportValue || '_______'}
+
+NIL RATED SUPPLIES:
+Value: Rs. ${data.nilRated || '_______'}
+
+TOTAL OUTWARD SUPPLIES: Rs. ${data.totalOutward || '_______'}
+
+VERIFICATION:
+I declare that the information given above is true and correct.
+
+${data.authorizedSignatory || data.partyName || '_____________'}
+Designation: ${data.designation || 'Authorized Signatory'}
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  'GST Refund Application': {
+    title: 'APPLICATION FOR GST REFUND',
+    generateContent: (data: FormData) => `To,
+The Assistant Commissioner
+GST Department
+${data.place || 'New Delhi'}
+
+Subject: Application for GST Refund for ${data.period || 'March 2025'}
+
+Sir/Madam,
+
+I, ${data.partyName || '_____________'}, having GSTIN ${data.gstin || data.gstNumber || '_____________'}, request refund of GST as per details below:
+
+REFUND DETAILS:
+Period: ${data.period || 'March 2025'}
+Refund Amount: Rs. ${data.refundAmount || '_______'}
+Reason: ${data.refundReason || 'Export without payment of tax'}
+
+BANK DETAILS:
+Bank: ${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+I declare that the claim is correct and I have not received refund for this period from any other authority.
+
+For ${data.firmName || '_____________'}
+
+${data.partnerName || data.partyName || '_____________'}
+Partner/Proprietor
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  }
+};
+
+// Helper function to check if a template exists
+export const hasTemplate = (formName: string): boolean => {
+  return formName in formTemplates;
+};
+
+// Helper function to generate form content
+export const generateFormContent = (formName: string, data: FormData): GeneratedForm | null => {
+  if (!hasTemplate(formName)) {
+    return null;
+  }
+  
+  const formData = {
+    ...data,
+    currentDate: data.currentDate || new Date().toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric'
+    })
+  };
+  
+  return {
+    title: formTemplates[formName].title,
+    content: formTemplates[formName].generateContent(formData)
+  };
+};
+
+// Helper function to get all available template names
+export const getAvailableTemplates = (): string[] => {
+  return Object.keys(formTemplates);
+};
   
   // Financial Information
   refundAmount?: string;
@@ -218,86 +906,680 @@ export interface GeneratedForm {
 }
 
 export const formTemplates: Record<string, FormTemplate> = {
-  // REFUND CATEGORY
-  'GST Refund Application': {
-    title: 'GST REFUND APPLICATION',
-    generateContent: (data: FormData) => `TO,
-THE ASST. COMMISSIONER
-GOODS & SERVICE TAX BIKRI KAR BHAWAN
-WARD NO. 74 NEW DELHI,
+  // ============= TAX CATEGORY TEMPLATES =============
+  
+  // REFUND SUBCATEGORY
+  'Income Tax Refund Application': {
+    title: 'APPLICATION FOR INCOME TAX REFUND',
+    generateContent: (data: FormData) => `To,
+The Assessing Officer
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+${data.place || 'New Delhi'}
 
-**REF GST NO. ${data.gstNumber || '_______________________'}**
-
-**SUBJECT: REFUND OF GST AMT. FOR THE FIRST QUARTER 2017-18**
-
-DEAR SIR,
-
-With Respect to the GST NO. ${data.gstNumber || '_________________'} and as required by you. I ${data.partnerName} Partner of the above Firm herewith Submitting the following facts and undertaking in support of this
-
-A) Cancelled Cheque
-B) Copy of Bank Statement Showing Proof of Payment
-C) I Declare Under Section 54(3)(iii) that refund of ITC claimed does not include ITC availed on goods and services used for making NIL rated or fully Exempt Supplies.
-D) I further undertake that the amount of refund Sanctioned will be paid back to the Government with interest whenever is found subsequently that the requirement of clause (C) of Sub Section (2) of Section 16 read with Sub Section (2) of Section 42 of the CGST/SGST have been complied with respect of amount refunded.
-E) I Certify That This Claim Of Refund Has Not Been Preferred To Central Or Any Other Authority.
-
-That I **${data.partnerName}** Solemnly affirm and declare as under that the information given above true and correct as per Para (a) to (e) and nothing has been Concealed there from.
-
-I further declare that no Refund amount for this period received by me till the date.
-
-For ${data.firmName}
-
-Date: ${data.currentDate}
-Place: ${data.place || 'Fatehpur'}
-
-Signature: _______________
-Name: ${data.partnerName}
-Designation: Partner`
-  },
-
-  'Income Tax Refund': {
-    title: 'INCOME TAX REFUND APPLICATION',
-    generateContent: (data: FormData) => `TO,
-THE INCOME TAX OFFICER
-WARD NO. ${data.wardNumber || '___'}
-INCOME TAX DEPARTMENT
-${data.itOfficeAddress || 'NEW DELHI'}
-
-**SUBJECT: APPLICATION FOR REFUND OF EXCESS TAX PAID FOR A.Y. ${data.assYear}**
+Subject: Application for Refund of Excess Income Tax Paid for A.Y. ${data.assYear || '2024-25'}
 
 Respected Sir/Madam,
 
-I, ${data.partyName}, PAN: ${data.panNumber || '_______________'}, respectfully submit that:
+I, ${data.partyName || '_____________'}, holding PAN ${data.panNumber || '__________'}, respectfully submit this application for refund of excess income tax paid for Assessment Year ${data.assYear || '2024-25'}.
 
-1. I have filed my Income Tax Return for A.Y. ${data.assYear} and the same has been processed.
+DETAILS:
+1. Name of Assessee: ${data.partyName || '_____________'}
+2. PAN: ${data.panNumber || '__________'}
+3. Assessment Year: ${data.assYear || '2024-25'}
+4. Address: ${data.address || '_____________'}
 
-2. As per the processing, there is an excess payment of Rs. ${data.refundAmount || '_______________'} made towards Income Tax.
+GROUNDS FOR REFUND:
+As per my computation and the provisions of Income Tax Act, 1961, I have paid excess tax of Rs. ${data.refundAmount || '_______'} during the financial year. The excess payment was made through:
+- Advance Tax: Rs. ${data.advanceTax || '_______'}
+- TDS: Rs. ${data.tdsAmount || '_______'}
+- Self Assessment Tax: Rs. ${data.selfAssessmentTax || '_______'}
 
-3. I request you to kindly process my refund claim and credit the amount to my bank account details as follows:
+BANK DETAILS FOR REFUND:
+Bank Name: ${data.bankName || '_____________'}
+Account Number: ${data.accountNumber || '_____________'}
+IFSC Code: ${data.ifscCode || '_____________'}
 
-   Bank Name: ${data.bankName || '_______________'}
-   Account No: ${data.accountNumber || '_______________'}
-   IFSC Code: ${data.ifscCode || '_______________'}
-
-4. All supporting documents are enclosed herewith.
-
-I request you to kindly process my refund at the earliest.
-
-Thanking you,
+I request you to kindly process my refund claim and credit the amount to the above bank account.
 
 Yours faithfully,
 
-${data.partyName}
-PAN: ${data.panNumber || '_______________'}
-Address: ${data.address}
-
-Date: ${data.currentDate}
-Place: ${data.place || 'Fatehpur'}
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}
 
 Enclosures:
 1. Copy of ITR Filed
-2. Copy of Processing Order
-3. Bank Account Details`
+2. Copy of Form 26AS
+3. Proof of Tax Payments
+4. Bank Account Details`
   },
+
+  'Excess Payment Refund': {
+    title: 'APPLICATION FOR EXCESS PAYMENT REFUND',
+    generateContent: (data: FormData) => `To,
+The Income Tax Officer
+Ward No: ${data.wardNumber || '_____'}
+${data.place || 'New Delhi'}
+
+Subject: Refund of Excess Payment made for A.Y. ${data.assYear || '2024-25'}
+
+Sir/Madam,
+
+I am ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, and I am writing to request a refund of excess payment made towards income tax.
+
+PAYMENT DETAILS:
+- Total Tax Paid: Rs. ${data.totalTaxPaid || '_______'}
+- Actual Tax Liability: Rs. ${data.actualTaxLiability || '_______'}
+- Excess Payment: Rs. ${data.excessAmount || '_______'}
+- Assessment Year: ${data.assYear || '2024-25'}
+
+The excess payment was made inadvertently while filing advance tax/self-assessment tax. I request you to process the refund and credit to my bank account.
+
+Bank Details:
+Name: ${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+Thanking you,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Tax Credit Refund': {
+    title: 'APPLICATION FOR TAX CREDIT REFUND',
+    generateContent: (data: FormData) => `To,
+The Assessing Officer
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+
+Subject: Refund of Tax Credit for A.Y. ${data.assYear || '2024-25'}
+
+Respected Sir/Madam,
+
+I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, request refund of tax credit as per details below:
+
+TAX CREDIT DETAILS:
+1. Relief under Section 89: Rs. ${data.relief89 || '_______'}
+2. Foreign Tax Credit: Rs. ${data.foreignTaxCredit || '_______'}
+3. Tax Credit u/s 115JAA: Rs. ${data.taxCredit115JAA || '_______'}
+4. Other Credits: Rs. ${data.otherCredits || '_______'}
+
+Total Credit Eligible for Refund: Rs. ${data.totalCredit || '_______'}
+
+I have filed my return for A.Y. ${data.assYear || '2024-25'} and the above credits are available for refund as per the provisions of Income Tax Act.
+
+Kindly process the refund to my bank account:
+${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+Yours sincerely,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Advance Tax Refund': {
+    title: 'APPLICATION FOR ADVANCE TAX REFUND',
+    generateContent: (data: FormData) => `To,
+The Income Tax Officer
+Ward No: ${data.wardNumber || '_____'}
+Income Tax Department
+
+Subject: Refund of Excess Advance Tax Paid for A.Y. ${data.assYear || '2024-25'}
+
+Sir/Madam,
+
+I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, have paid excess advance tax for the Assessment Year ${data.assYear || '2024-25'}.
+
+ADVANCE TAX PAYMENT DETAILS:
+- 1st Installment (15th June): Rs. ${data.installment1 || '_______'}
+- 2nd Installment (15th Sep): Rs. ${data.installment2 || '_______'}
+- 3rd Installment (15th Dec): Rs. ${data.installment3 || '_______'}
+- 4th Installment (15th Mar): Rs. ${data.installment4 || '_______'}
+
+Total Advance Tax Paid: Rs. ${data.totalAdvanceTax || '_______'}
+Actual Tax Liability: Rs. ${data.actualTaxLiability || '_______'}
+Excess Payment: Rs. ${data.excessAdvanceTax || '_______'}
+
+The excess payment occurred due to changes in income/circumstances during the year. I request refund of the excess amount.
+
+Bank Details for Refund:
+Bank: ${data.bankName || '_____________'}
+Account: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+Thanking you,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  // ASSESSMENT SUBCATEGORY
+  'Self Assessment Tax': {
+    title: 'SELF ASSESSMENT TAX PAYMENT CHALLAN',
+    generateContent: (data: FormData) => `CHALLAN NO. ${data.challanNumber || '_____________'}
+INCOME TAX DEPARTMENT
+SELF ASSESSMENT TAX PAYMENT
+
+Assessee Details:
+Name: ${data.partyName || '_____________'}
+PAN: ${data.panNumber || '__________'}
+Assessment Year: ${data.assYear || '2024-25'}
+Address: ${data.address || '_____________'}
+
+Tax Computation:
+Total Income: Rs. ${data.totalIncome || '_______'}
+Tax on Total Income: Rs. ${data.taxOnIncome || '_______'}
+Add: Surcharge: Rs. ${data.surcharge || '_______'}
+Add: Education Cess: Rs. ${data.educationCess || '_______'}
+Total Tax Liability: Rs. ${data.totalTaxLiability || '_______'}
+
+Less: Advance Tax Paid: Rs. ${data.advanceTaxPaid || '_______'}
+Less: TDS: Rs. ${data.tdsDeducted || '_______'}
+Less: TCS: Rs. ${data.tcsCollected || '_______'}
+
+Self Assessment Tax Payable: Rs. ${data.selfAssessmentTax || '_______'}
+
+Payment Details:
+Challan No: ${data.challanNumber || '_______'}
+Date of Payment: ${data.paymentDate || '_______'}
+Bank: ${data.bankName || '_______'}
+
+I declare that the above information is true and correct.
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Regular Assessment': {
+    title: 'NOTICE FOR REGULAR ASSESSMENT',
+    generateContent: (data: FormData) => `INCOME TAX DEPARTMENT
+NOTICE UNDER SECTION 143(2)
+
+To,
+${data.partyName || '_____________'}
+PAN: ${data.panNumber || '__________'}
+${data.address || '_____________'}
+
+Assessment Year: ${data.assYear || '2024-25'}
+Case ID: ${data.caseId || '_______'}
+
+You are required to appear before the undersigned on ${data.hearingDate || '_______'} at ${data.hearingTime || '11:00 AM'} for assessment proceedings under Section 143(3) of the Income Tax Act, 1961.
+
+DISCREPANCIES NOTED:
+1. ${data.discrepancy1 || 'Income not offered to tax'}
+2. ${data.discrepancy2 || 'Excessive claims'}
+3. ${data.discrepancy3 || 'Other matters'}
+
+DOCUMENTS REQUIRED:
+- Books of Accounts
+- Vouchers and Bills
+- Bank Statements
+- Investment Proofs
+- Any other relevant documents
+
+Failure to appear may result in ex-parte assessment.
+
+${data.assessingOfficer || 'Income Tax Officer'}
+Ward No: ${data.wardNumber || '_____'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= TDS CATEGORY TEMPLATES =============
+  
+  'TDS Return Filing (24Q)': {
+    title: 'TDS RETURN FORM 24Q - QUARTERLY RETURN',
+    generateContent: (data: FormData) => `FORM 24Q
+QUARTERLY RETURN OF TAX DEDUCTED AT SOURCE ON SALARIES
+
+Deductor Details:
+Name: ${data.deductorName || data.firmName || '_____________'}
+TAN: ${data.tanNumber || '__________'}
+PAN: ${data.panNumber || '__________'}
+Address: ${data.address || '_____________'}
+
+Return Details:
+Quarter: ${data.quarter || 'Q4'}
+Financial Year: ${data.financialYear || '2024-25'}
+Original/Revised: ${data.returnType || 'Original'}
+
+Summary of TDS:
+Total No. of Employees: ${data.totalEmployees || '_______'}
+Total Salary Paid: Rs. ${data.totalSalary || '_______'}
+Total TDS Deducted: Rs. ${data.totalTDS || '_______'}
+Total TDS Deposited: Rs. ${data.totalTDSDeposited || '_______'}
+
+Challan Details:
+Challan 1: ${data.challan1 || '_______'} - Rs. ${data.amount1 || '_______'}
+Challan 2: ${data.challan2 || '_______'} - Rs. ${data.amount2 || '_______'}
+Challan 3: ${data.challan3 || '_______'} - Rs. ${data.amount3 || '_______'}
+
+DECLARATION:
+I, ${data.authorizedPerson || data.partyName || '_____________'}, declare that the information given above is true and correct.
+
+Signature: _______________
+Name: ${data.authorizedPerson || data.partyName || '_____________'}
+Designation: ${data.designation || 'Authorized Signatory'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Form 16 Generation': {
+    title: 'FORM 16 - CERTIFICATE OF DEDUCTION OF TAX FROM SALARY',
+    generateContent: (data: FormData) => `FORM 16
+[See rule 31(1)(a)]
+Certificate of deduction of tax from salary
+
+Part A
+1. Name and address of the Employer: ${data.employerName || data.firmName || '_____________'}
+   ${data.employerAddress || data.address || '_____________'}
+
+2. TAN of the Deductor: ${data.tanNumber || '__________'}
+
+3. PAN of the Deductor: ${data.employerPAN || '__________'}
+
+4. CIT(TDS) where annual return/statement for the F.Y. is filed: ${data.citTDS || '_______'}
+
+5. Employee Details:
+   Name: ${data.employeeName || data.partyName || '_____________'}
+   PAN: ${data.employeePAN || data.panNumber || '__________'}
+   Employee Code: ${data.employeeCode || '_______'}
+   Address: ${data.employeeAddress || data.address || '_____________'}
+
+6. Period: From ${data.periodFrom || '01/04/2024'} To ${data.periodTo || '31/03/2025'}
+
+7. Assessment Year: ${data.assYear || '2025-26'}
+
+Part B
+Details of Salary paid and any other income and tax deducted:
+
+1. Gross Salary:
+   (a) Salary as per provisions: Rs. ${data.basicSalary || '_______'}
+   (b) Value of perquisites: Rs. ${data.perquisites || '_______'}
+   (c) Profits in lieu of salary: Rs. ${data.profitsInLieu || '_______'}
+   Total: Rs. ${data.grossSalary || '_______'}
+
+2. Less: Allowances to the extent exempt: Rs. ${data.exemptAllowances || '_______'}
+
+3. Balance (1-2): Rs. ${data.balanceIncome || '_______'}
+
+4. Deductions under Chapter VI-A:
+   Section 80C: Rs. ${data.sec80C || '_______'}
+   Section 80D: Rs. ${data.sec80D || '_______'}
+   Other Sections: Rs. ${data.otherDeductions || '_______'}
+   Total: Rs. ${data.totalDeductions || '_______'}
+
+5. Total Income (3-4): Rs. ${data.totalIncome || '_______'}
+
+6. Tax on total income: Rs. ${data.taxOnIncome || '_______'}
+
+7. Education Cess: Rs. ${data.educationCess || '_______'}
+
+8. Total Tax Payable: Rs. ${data.totalTaxPayable || '_______'}
+
+9. Relief under section 89: Rs. ${data.reliefSec89 || '_______'}
+
+10. Net Tax Payable: Rs. ${data.netTaxPayable || '_______'}
+
+11. Total TDS: Rs. ${data.totalTDS || '_______'}
+
+This is to certify that the tax deducted as shown above has been paid to the credit of Central Government.
+
+Signature: _______________
+${data.authorizedSignatory || '_____________'}
+Designation: ${data.designation || 'HR Manager'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= SERVE CATEGORY TEMPLATES =============
+  
+  'Income Tax Notice Reply': {
+    title: 'REPLY TO INCOME TAX NOTICE',
+    generateContent: (data: FormData) => `To,
+${data.assessingOfficer || 'The Assessing Officer'}
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+${data.itOfficeAddress || data.place || 'New Delhi'}
+
+Subject: Reply to Notice under Section ${data.noticeSection || '143(2)'} dated ${data.noticeDate || '_______'}
+
+Respected Sir/Madam,
+
+With reference to your notice dated ${data.noticeDate || '_______'} under Section ${data.noticeSection || '143(2)'} of the Income Tax Act, 1961, I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, submit my reply as follows:
+
+ASSESSEE DETAILS:
+Name: ${data.partyName || '_____________'}
+PAN: ${data.panNumber || '__________'}
+Assessment Year: ${data.assYear || '2024-25'}
+Address: ${data.address || '_____________'}
+
+REPLY TO QUERIES:
+
+1. ${data.query1 || 'Regarding undisclosed income'}: 
+   ${data.reply1 || 'The income has been properly disclosed in the return filed.'}
+
+2. ${data.query2 || 'Regarding investments made'}:
+   ${data.reply2 || 'All investments are made from disclosed sources of income.'}
+
+3. ${data.query3 || 'Regarding expenses claimed'}:
+   ${data.reply3 || 'All expenses are genuine and supported by proper vouchers.'}
+
+DOCUMENTS ENCLOSED:
+1. ${data.document1 || 'Copy of Books of Accounts'}
+2. ${data.document2 || 'Bank Statements'}
+3. ${data.document3 || 'Investment Proofs'}
+4. ${data.document4 || 'Bills and Vouchers'}
+
+I submit that the return filed is correct and complete. I request you to kindly consider the above submission and close the case.
+
+I remain available for any clarification if required.
+
+Thanking you,
+Yours faithfully,
+
+${data.partyName || '_____________'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}
+
+Enclosures: As mentioned above`
+  },
+
+  'Personal Hearing Request': {
+    title: 'APPLICATION FOR PERSONAL HEARING',
+    generateContent: (data: FormData) => `To,
+${data.assessingOfficer || 'The Assessing Officer'}
+Income Tax Department
+Ward No: ${data.wardNumber || '_____'}
+${data.place || 'New Delhi'}
+
+Subject: Request for Personal Hearing for A.Y. ${data.assYear || '2024-25'}
+
+Respected Sir/Madam,
+
+I, ${data.partyName || '_____________'}, PAN: ${data.panNumber || '__________'}, request for a personal hearing in connection with the assessment proceedings for Assessment Year ${data.assYear || '2024-25'}.
+
+CASE DETAILS:
+Case ID: ${data.caseId || '_______'}
+Notice Date: ${data.noticeDate || '_______'}
+Last Date for Compliance: ${data.lastDate || '_______'}
+
+GROUNDS FOR HEARING:
+
+1. ${data.ground1 || 'To explain the facts and circumstances of the case'}
+2. ${data.ground2 || 'To present additional evidence'}
+3. ${data.ground3 || 'To clarify doubts regarding income computation'}
+4. ${data.ground4 || 'To seek guidance on tax implications'}
+
+I request you to kindly grant me a hearing on any date convenient to you after ${data.preferredDate || '_______'}.
+
+My preferred timings are: ${data.preferredTime || '11:00 AM to 4:00 PM'}
+
+I assure you of my cooperation and timely appearance.
+
+Thanking you,
+Yours faithfully,
+
+${data.partyName || '_____________'}
+Contact: ${data.phone || '_______'}
+Email: ${data.email || '_______'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= VAL CATEGORY TEMPLATES =============
+  
+  'Property Valuation Report': {
+    title: 'PROPERTY VALUATION REPORT',
+    generateContent: (data: FormData) => `PROPERTY VALUATION REPORT
+
+CLIENT DETAILS:
+Name: ${data.clientName || data.partyName || '_____________'}
+Address: ${data.clientAddress || data.address || '_____________'}
+PAN: ${data.panNumber || '__________'}
+
+PROPERTY DETAILS:
+Property Type: ${data.propertyType || 'Residential/Commercial'}
+Property Address: ${data.propertyAddress || '_____________'}
+Survey No: ${data.surveyNumber || '_______'}
+Area: ${data.area || '_______'} sq.ft.
+Built-up Area: ${data.builtupArea || '_______'} sq.ft.
+
+VALUATION DETAILS:
+Date of Valuation: ${data.valuationDate || data.currentDate || new Date().toLocaleDateString()}
+Purpose of Valuation: ${data.valuationPurpose || 'Tax Assessment'}
+Method Used: ${data.valuationMethod || 'Comparable Sales Method'}
+
+COMPARABLE SALES:
+Sale 1: ${data.comparable1 || '_______'} - Rs. ${data.rate1 || '_______'} per sq.ft.
+Sale 2: ${data.comparable2 || '_______'} - Rs. ${data.rate2 || '_______'} per sq.ft.
+Sale 3: ${data.comparable3 || '_______'} - Rs. ${data.rate3 || '_______'} per sq.ft.
+
+Average Rate: Rs. ${data.averageRate || '_______'} per sq.ft.
+
+FACTORS CONSIDERED:
+1. Location and Accessibility
+2. Age and Condition of Property
+3. Amenities Available
+4. Market Trends
+5. Legal Status
+
+VALUATION:
+Land Value: Rs. ${data.landValue || '_______'}
+Building Value: Rs. ${data.buildingValue || '_______'}
+Total Market Value: Rs. ${data.totalValue || '_______'}
+
+CERTIFICATE:
+I certify that the above valuation has been carried out as per standard valuation practices and represents the fair market value of the property as on ${data.valuationDate || data.currentDate}.
+
+${data.valuatorName || '_____________'}
+Registered Valuer
+Registration No: ${data.valuatorRegNo || '_______'}
+Date: ${data.currentDate || new Date().toLocaleDateString()}
+Place: ${data.place || '_______'}`
+  },
+
+  'Company Valuation': {
+    title: 'COMPANY VALUATION REPORT',
+    generateContent: (data: FormData) => `COMPANY VALUATION REPORT
+
+COMPANY DETAILS:
+Name: ${data.companyName || '_____________'}
+CIN: ${data.cin || '_______'}
+PAN: ${data.panNumber || '__________'}
+Address: ${data.address || '_____________'}
+
+VALUATION DETAILS:
+Valuation Date: ${data.valuationDate || data.currentDate}
+Valuation Purpose: ${data.purpose || 'Income Tax Assessment'}
+Valuation Method: ${data.method || 'DCF Method'}
+
+FINANCIAL HIGHLIGHTS:
+Revenue (Current Year): Rs. ${data.revenue || '_______'} Lakhs
+EBITDA: Rs. ${data.ebitda || '_______'} Lakhs
+Net Profit: Rs. ${data.netProfit || '_______'} Lakhs
+Total Assets: Rs. ${data.totalAssets || '_______'} Lakhs
+Net Worth: Rs. ${data.netWorth || '_______'} Lakhs
+
+VALUATION SUMMARY:
+Asset Value: Rs. ${data.assetValue || '_______'} Lakhs
+Earnings Value: Rs. ${data.earningsValue || '_______'} Lakhs
+Market Value: Rs. ${data.marketValue || '_______'} Lakhs
+
+Fair Value per Share: Rs. ${data.valuePerShare || '_______'}
+Total Company Value: Rs. ${data.totalCompanyValue || '_______'} Lakhs
+
+${data.valuatorName || 'Certified Valuer'}
+Registration No: ${data.valuatorRegNo || '_______'}
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= ROC CATEGORY TEMPLATES =============
+  
+  'Annual Return Filing': {
+    title: 'FORM MGT-7 - ANNUAL RETURN',
+    generateContent: (data: FormData) => `FORM MGT-7
+ANNUAL RETURN
+[Pursuant to section 92(3) of the Companies Act, 2013 and rule 12(1) of the Companies (Management and Administration) Rules, 2014]
+
+COMPANY DETAILS:
+1. CIN: ${data.cin || '_______'}
+2. Company Name: ${data.companyName || '_____________'}
+3. Address: ${data.registeredOffice || data.address || '_____________'}
+4. Email: ${data.companyEmail || data.email || '_______'}
+5. Telephone: ${data.companyPhone || '_______'}
+
+FINANCIAL YEAR: From ${data.fyFrom || '01/04/2024'} To ${data.fyTo || '31/03/2025'}
+
+PRINCIPAL BUSINESS ACTIVITIES:
+1. ${data.businessActivity1 || 'Trading and Commerce'}
+2. ${data.businessActivity2 || 'Manufacturing'}
+
+PARTICULARS OF HOLDING AND SUBSIDIARY COMPANIES:
+${data.subsidiaryDetails || 'Not Applicable'}
+
+SHARE CAPITAL:
+Authorized Capital: Rs. ${data.authorizedCapital || '_______'}
+Issued Capital: Rs. ${data.issuedCapital || '_______'}
+Subscribed Capital: Rs. ${data.subscribedCapital || '_______'}
+Paid-up Capital: Rs. ${data.paidupCapital || '_______'}
+
+DIRECTORS DETAILS:
+1. Name: ${data.director1 || '_______'} DIN: ${data.din1 || '_______'}
+2. Name: ${data.director2 || '_______'} DIN: ${data.din2 || '_______'}
+
+MEETINGS:
+Board Meetings Held: ${data.boardMeetings || '_______'}
+AGM Date: ${data.agmDate || '_______'}
+
+COMPLIANCE CERTIFICATES:
+All applicable provisions of Companies Act, 2013 have been complied with.
+
+For ${data.companyName || '_____________'}
+
+${data.directorName || '_____________'}
+Director
+DIN: ${data.directorDIN || '_______'}
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  // ============= GST CATEGORY TEMPLATES =============
+  
+  'New GST Registration': {
+    title: 'APPLICATION FOR GST REGISTRATION',
+    generateContent: (data: FormData) => `APPLICATION FOR REGISTRATION UNDER GST
+FORM GST REG-01
+
+APPLICANT DETAILS:
+1. Legal Name: ${data.legalName || data.partyName || '_____________'}
+2. Trade Name: ${data.tradeName || '_____________'}
+3. PAN: ${data.panNumber || '__________'}
+4. Constitution of Business: ${data.constitution || 'Proprietorship'}
+
+BUSINESS DETAILS:
+Principal Place of Business:
+${data.principalAddress || data.address || '_____________'}
+Pin Code: ${data.pincode || '_______'}
+State: ${data.state || '_______'}
+
+Additional Places of Business:
+${data.additionalPlaces || 'Not Applicable'}
+
+BUSINESS ACTIVITIES:
+Nature of Business: ${data.businessNature || 'Trading'}
+Date of Commencement: ${data.commencementDate || '_______'}
+Reason for Registration: ${data.registrationReason || 'Aggregate turnover exceeded threshold'}
+
+PRODUCTS/SERVICES:
+1. ${data.product1 || 'Trading of Goods'} - HSN: ${data.hsn1 || '_______'}
+2. ${data.product2 || 'Services'} - HSN: ${data.hsn2 || '_______'}
+
+BANK DETAILS:
+Bank Name: ${data.bankName || '_____________'}
+Branch: ${data.bankBranch || '_______'}
+Account Number: ${data.accountNumber || '_____________'}
+IFSC: ${data.ifscCode || '_____________'}
+
+PROMOTER/PARTNER DETAILS:
+Name: ${data.partnerName || data.partyName || '_____________'}
+PAN: ${data.partnerPAN || data.panNumber || '__________'}
+DIN/Membership No: ${data.din || '_______'}
+Mobile: ${data.mobile || '_______'}
+Email: ${data.email || '_______'}
+
+DECLARATION:
+I/We hereby declare that the information given above is true and correct to the best of my/our knowledge and belief.
+
+${data.authorizedSignatory || data.partyName || '_____________'}
+Designation: ${data.designation || 'Proprietor'}
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  },
+
+  'GSTR-1 Filing': {
+    title: 'FORM GSTR-1 - OUTWARD SUPPLIES',
+    generateContent: (data: FormData) => `FORM GSTR-1
+DETAILS OF OUTWARD SUPPLIES OF GOODS OR SERVICES OR BOTH
+
+GSTIN: ${data.gstin || data.gstNumber || '_____________'}
+Legal Name: ${data.legalName || data.partyName || '_____________'}
+Trade Name: ${data.tradeName || '_____________'}
+Period: ${data.period || 'March 2025'}
+
+3.1 - BUSINESS TO BUSINESS SUPPLIES:
+Place of Supply | Invoice Value | Taxable Value | Integrated Tax | Central Tax | State/UT Tax | Cess
+${data.b2bDetails || 'State wise summary to be filled'}
+
+4 - BUSINESS TO CONSUMER SUPPLIES:
+4A - B2C (Large) [Invoice value > Rs. 2.5 Lakh]:
+Place of Supply: ${data.b2clPlace || '_______'}
+Invoice Value: Rs. ${data.b2clValue || '_______'}
+Taxable Value: Rs. ${data.b2clTaxable || '_______'}
+
+4B - B2C (Small) [Invoice value ≤ Rs. 2.5 Lakh]:
+Place of Supply: ${data.b2csPlace || '_______'}
+Total Value: Rs. ${data.b2csValue || '_______'}
+Taxable Value: Rs. ${data.b2csTaxable || '_______'}
+
+5 - EXPORTS:
+Export without Payment: Rs. ${data.exportWoPayment || '_______'}
+Export with Payment: Rs. ${data.exportWithPayment || '_______'}
+
+6 - NIL RATED, EXEMPTED AND NON-GST OUTWARD SUPPLIES:
+Nil Rated: Rs. ${data.nilRated || '_______'}
+Exempted: Rs. ${data.exempted || '_______'}
+Non-GST: Rs. ${data.nonGST || '_______'}
+
+HSN-WISE SUMMARY:
+HSN Code | Description | UQC | Total Qty | Value | Taxable Value | IGST | CGST | SGST/UTGST | Cess
+${data.hsnSummary || 'HSN wise details to be filled'}
+
+TOTAL OUTWARD SUPPLIES: Rs. ${data.totalOutward || '_______'}
+
+VERIFICATION:
+I hereby solemnly affirm and declare that the information given above is true and correct to the best of my knowledge and belief and nothing has been concealed therefrom.
+
+${data.authorizedSignatory || data.partyName || '_____________'}
+Designation: ${data.designation || 'Authorized Signatory'}
+Date: ${data.currentDate}
+Place: ${data.place || '_______'}`
+  }
+};
+
+// Helper function to get all available template names
+export const getAvailableTemplates = (): string[] => {
+  return Object.keys(formTemplates);
+};
 
   'Excess Payment Refund': {
     title: 'EXCESS PAYMENT REFUND APPLICATION',

@@ -25,10 +25,10 @@ import {
 import {
   formTemplates,
   generateFormContent,
-  hasTemplate,
+  hasTemplate as importedHasTemplate,
   type FormData,
   type FormTemplate,
-} from "../../lib/formtemplate";
+} from "../../lib/formtemplate_new";
 
 interface Document {
   id: number;
@@ -51,6 +51,33 @@ interface PreviewContent {
 interface FormCategories {
   [key: string]: string[];
 }
+
+// Create a fallback formTemplates object if the imported one is not valid
+const fallbackFormTemplates: Record<string, any> = {};
+
+// Define customTemplates globally to use in hasTemplate
+let customTemplates: Record<string, string> = {};
+
+// Create a local implementation of hasTemplate to use as a fallback
+const hasTemplate = (formName: string): boolean => {
+  if (!formName) return false;
+  
+  // Check imported formTemplates first
+  if (typeof formTemplates === 'object' && formTemplates !== null && formName in formTemplates) {
+    console.log(`Form ${formName} found in imported formTemplates`);
+    return true;
+  }
+  
+  // If the form name exists in customTemplates, consider it a valid template
+  if (typeof customTemplates === 'object' && customTemplates !== null && formName in customTemplates) {
+    console.log(`Form ${formName} found in customTemplates`);
+    return true;
+  }
+  
+  console.log(`Form ${formName} not found in any template collection, using fallback`);
+  // Consider all forms valid for generating templates (fallback behavior)
+  return true;
+};
 
 export default function EnhancedDepartmentalLetters() {
   const [selectedTab, setSelectedTab] = useState("Tax");
@@ -78,7 +105,8 @@ export default function EnhancedDepartmentalLetters() {
   const [filedDate, setFiledDate] = useState("");
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
   const [editableTemplate, setEditableTemplate] = useState("");
-  const [customTemplates, setCustomTemplates] = useState<{[key: string]: string}>({});
+  // Use the global customTemplates variable with useState
+  const [localCustomTemplates, setCustomTemplates] = useState<{[key: string]: string}>(customTemplates);
   // Add missing state variables for PAN, bank details, etc.
   const [panNumber, setPanNumber] = useState("");
   const [wardNumber, setWardNumber] = useState("");
@@ -428,21 +456,109 @@ export default function EnhancedDepartmentalLetters() {
   };
 
   const generateCustomFormContent = (formName: string, formData: FormData) => {
-    // Check if we have a custom template for this form
-    if (customTemplates[formName]) {
+    if (!formName) {
       return {
-        title: formName,
-        content: customTemplates[formName]
+        title: "Error",
+        content: "No form name provided"
       };
     }
     
-    // Otherwise use the original template
-    return generateFormContent(formName, formData);
+    console.log("Generating content for form:", formName);
+    
+    // Check if we have a custom template for this form
+    if (localCustomTemplates[formName]) {
+      console.log("Using custom template for", formName);
+      return {
+        title: formName,
+        content: localCustomTemplates[formName]
+      };
+    }
+    
+    // Check if formTemplates exists and has the specified form
+    if (typeof formTemplates === 'object' && formTemplates !== null && formName in formTemplates) {
+      console.log("Using imported template for", formName);
+      try {
+        // Check if it has a generateContent method
+        if (typeof formTemplates[formName]?.generateContent === 'function') {
+          const generatedContent = formTemplates[formName].generateContent(formData);
+          return {
+            title: formTemplates[formName].title || formName,
+            content: generatedContent
+          };
+        }
+      } catch (error) {
+        console.error("Error using template directly:", error);
+      }
+    }
+    
+    // Otherwise use the generateFormContent function
+    try {
+      if (typeof generateFormContent === 'function') {
+        console.log("Calling generateFormContent for", formName);
+        const result = generateFormContent(formName, formData);
+        console.log("Result from generateFormContent:", result);
+        if (result) return result;
+      } else {
+        console.warn("generateFormContent is not a function", typeof generateFormContent);
+      }
+    } catch (error) {
+      console.error("Error generating form content:", error);
+    }
+    
+    // Create a basic template if generateFormContent failed
+    console.log("Using fallback template for", formName);
+    
+    // Create a more detailed fallback template using the available form data
+    const formattedDate = new Date().toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    
+    console.log("Creating comprehensive fallback template for", formName);
+    
+    let fallbackTemplate = `
+======================================
+${formName.toUpperCase()}
+======================================
+Date: ${formData.currentDate || formattedDate}
+
+To,
+${formData.partyName || "Party Name"}
+${formData.address || "Address"}
+
+Subject: ${formName}
+
+Dear ${formData.partyName || "Sir/Madam"},
+
+This is regarding ${formName}. Please find the details below:
+
+`;
+
+    // Add any available form data to the fallback template
+    if (formData.assYear) fallbackTemplate += `Assessment Year: ${formData.assYear}\n`;
+    if (formData.panNumber) fallbackTemplate += `PAN: ${formData.panNumber}\n`;
+    if (formData.gstNumber) fallbackTemplate += `GST Number: ${formData.gstNumber}\n`;
+    if (formData.refundAmount) fallbackTemplate += `Refund Amount: ${formData.refundAmount}\n`;
+    if (formData.tdsAmount) fallbackTemplate += `TDS Amount: ${formData.tdsAmount}\n`;
+    if (formData.wardNumber) fallbackTemplate += `Ward Number: ${formData.wardNumber}\n`;
+
+    fallbackTemplate += `\nPlease let us know if you require any additional information.
+
+Yours Sincerely,
+${formData.firmName || "Your Firm Name"}
+${formData.place || "Place"}
+`;
+    
+    return {
+      title: formName,
+      content: fallbackTemplate
+    };
   };
 
   const handleCreate = () => {
     const formToUse = getActiveDocumentForm();
-    if (formToUse && hasTemplate(formToUse)) {
+    if (formToUse && typeof hasTemplate === 'function' && hasTemplate(formToUse)) {
       const formData = getFormData();
 
       const generatedForm = generateCustomFormContent(formToUse, formData);
@@ -455,21 +571,51 @@ export default function EnhancedDepartmentalLetters() {
 
   const handlePreview = () => {
     const formToUse = getActiveDocumentForm();
-    if (formToUse && hasTemplate(formToUse)) {
+    console.log("Preview form to use:", formToUse);
+    console.log("Available formTemplates:", formTemplates ? Object.keys(formTemplates) : "formTemplates is undefined");
+    
+    if (formToUse) {
+      // Always attempt to show something
       const formData = getFormData();
+      console.log("Form data for preview:", formData);
 
-      // Store the generated content for preview
-      const generatedForm = generateCustomFormContent(formToUse, formData);
-      setPreviewContent(generatedForm);
-      setShowPreview(true);
+      try {
+        // Store the generated content for preview
+        const generatedForm = generateCustomFormContent(formToUse, formData);
+        console.log("Generated form content for preview:", generatedForm);
+        
+        if (generatedForm && generatedForm.content) {
+          setPreviewContent(generatedForm);
+          setShowPreview(true);
+        } else {
+          console.error("Generated form has no content");
+          // Still show the preview with an error message
+          setPreviewContent({
+            title: formToUse,
+            content: `No template content could be generated for "${formToUse}".\n\nThis might be because the template is not properly defined or there was an error during generation.\n\nPlease check the browser console for more details.`
+          });
+          setShowPreview(true);
+          showNotification("Using fallback template content", 'warning');
+        }
+      } catch (error) {
+        console.error("Error in handlePreview:", error);
+        // Always show something in preview even after error
+        setPreviewContent({
+          title: formToUse,
+          content: `Error generating preview for "${formToUse}".\n\nPlease check the browser console for details.\n\nError: ${error instanceof Error ? error.message : String(error)}`
+        });
+        setShowPreview(true);
+        showNotification("Error generating template, using fallback", 'error');
+      }
     } else {
-      showNotification("Please select a document first or template not available", 'error');
+      console.log("No form selected");
+      showNotification("Please select a document first", 'error');
     }
   };
 
   const handlePrint = () => {
     const formToUse = getActiveDocumentForm();
-    if (formToUse && hasTemplate(formToUse)) {
+    if (formToUse && typeof hasTemplate === 'function' && hasTemplate(formToUse)) {
       const formData = getFormData();
 
       const generatedForm = generateCustomFormContent(formToUse, formData);
@@ -532,7 +678,7 @@ export default function EnhancedDepartmentalLetters() {
       setEditFormData(currentFormData);
       
       // Generate current template content for editing
-      if (hasTemplate(formToUse)) {
+      if (formToUse && typeof hasTemplate === 'function' && hasTemplate(formToUse)) {
         const generatedForm = generateCustomFormContent(formToUse, currentFormData);
         if (generatedForm) {
           setEditableTemplate(generatedForm.content);
@@ -581,7 +727,7 @@ export default function EnhancedDepartmentalLetters() {
 
   const handleEmailSend = () => {
     const formToUse = getActiveDocumentForm();
-    if (formToUse && hasTemplate(formToUse) && emailAddress) {
+    if (formToUse && typeof hasTemplate === 'function' && hasTemplate(formToUse) && emailAddress) {
       const formData = {
         ...getFormData(),
         email: emailAddress,
@@ -622,7 +768,7 @@ export default function EnhancedDepartmentalLetters() {
 
     selectedEmailDocuments.forEach((docId, index) => {
       const doc = documents.find(d => d.id === docId);
-      if (doc && hasTemplate(doc.name)) {
+      if (doc && typeof hasTemplate === 'function' && hasTemplate(doc.name)) {
         const generatedForm = generateCustomFormContent(doc.name, formData);
         if (generatedForm) {
           allTitles.push(generatedForm.title);
@@ -654,10 +800,14 @@ export default function EnhancedDepartmentalLetters() {
     const formToUse = getActiveDocumentForm();
     // Save the edited template content if it was modified
     if (showTemplateEditor && editableTemplate && formToUse) {
-      setCustomTemplates(prev => ({
-        ...prev,
+      const updatedTemplates = {
+        ...localCustomTemplates,
         [formToUse]: editableTemplate
-      }));
+      };
+      
+      // Update both the state and the global variable
+      setCustomTemplates(updatedTemplates);
+      customTemplates = updatedTemplates;
     }
     
     // Update the main form data with edited values - now properly saves all fields
@@ -691,18 +841,18 @@ export default function EnhancedDepartmentalLetters() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950 transition-colors duration-300">
       {/* Header */}
-      <header className="bg-white shadow-lg border-b border-slate-200">
+      <header className="bg-white dark:bg-gray-900 shadow-lg border-b border-slate-200 dark:border-gray-700 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <FileText className="h-8 w-8 text-blue-600" />
+              <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               <div>
-                <h1 className="text-xl font-bold text-slate-900">
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white">
                   Departmental Letters
                 </h1>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-gray-400">
                   CompuTax Management System
                 </p>
               </div>
@@ -710,7 +860,7 @@ export default function EnhancedDepartmentalLetters() {
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100"
+              className="lg:hidden p-2 rounded-md text-slate-600 dark:text-slate-300 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
             >
               {isMobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -729,7 +879,7 @@ export default function EnhancedDepartmentalLetters() {
                     className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                       selectedTab === tab.id
                         ? "bg-blue-600 text-white shadow-lg transform scale-105"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-gray-700 hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     <Icon className="h-4 w-4 mr-2" />
@@ -742,7 +892,7 @@ export default function EnhancedDepartmentalLetters() {
           </div>
 
           {isMobileMenuOpen && (
-            <div className="lg:hidden py-4 border-t border-slate-200">
+            <div className="lg:hidden py-4 border-t border-slate-200 dark:border-gray-700">
               <div className="grid grid-cols-3 gap-2">
                 {tabs.map((tab, index) => {
                   const Icon = tab.icon;
@@ -756,7 +906,7 @@ export default function EnhancedDepartmentalLetters() {
                       className={`flex flex-col items-center p-3 rounded-lg font-medium transition-all duration-200 ${
                         selectedTab === tab.id
                           ? "bg-blue-600 text-white"
-                          : "text-slate-600 hover:bg-slate-100"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-gray-600"
                       }`}
                     >
                       <Icon className="h-5 w-5 mb-1" />
@@ -771,7 +921,7 @@ export default function EnhancedDepartmentalLetters() {
       </header>
 
       {/* Tab Statistics Section */}
-      <div className="bg-blue-50 border-b border-blue-200">
+      <div className="bg-blue-50 dark:bg-blue-900 border-b border-blue-200 dark:border-blue-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
@@ -779,29 +929,29 @@ export default function EnhancedDepartmentalLetters() {
                 {selectedTab} Department Statistics
               </h3>
               <div className="flex items-center space-x-4 text-sm">
-                <div className="bg-white px-3 py-1 rounded-full border border-blue-200">
-                  <span className="text-blue-700 font-medium">Categories: </span>
-                  <span className="text-blue-900 font-bold">{Object.keys(formCategories).length}</span>
+                <div className="bg-white dark:bg-gray-700 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-600 dark:border-blue-600">
+                  <span className="text-blue-700 dark:text-blue-300 dark:text-blue-300 font-medium">Categories: </span>
+                  <span className="text-blue-900 dark:text-blue-100 font-bold">{Object.keys(formCategories).length}</span>
                 </div>
-                <div className="bg-white px-3 py-1 rounded-full border border-blue-200">
-                  <span className="text-blue-700 font-medium">Total Forms: </span>
-                  <span className="text-blue-900 font-bold">
+                <div className="bg-white dark:bg-gray-700 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-600 dark:border-blue-600">
+                  <span className="text-blue-700 dark:text-blue-300 dark:text-blue-300 font-medium">Total Forms: </span>
+                  <span className="text-blue-900 dark:text-blue-100 font-bold">
                     {Object.values(formCategories).flat().length}
                   </span>
                 </div>
-                <div className="bg-white px-3 py-1 rounded-full border border-blue-200">
-                  <span className="text-blue-700 font-medium">Documents Created: </span>
-                  <span className="text-blue-900 font-bold">{documents.length}</span>
+                <div className="bg-white dark:bg-gray-700 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-600 dark:border-blue-600">
+                  <span className="text-blue-700 dark:text-blue-300 dark:text-blue-300 font-medium">Documents Created: </span>
+                  <span className="text-blue-900 dark:text-blue-100 font-bold">{documents.length}</span>
                 </div>
-                <div className="bg-white px-3 py-1 rounded-full border border-blue-200">
-                  <span className="text-blue-700 font-medium">Selected: </span>
-                  <span className="text-blue-900 font-bold">
+                <div className="bg-white dark:bg-gray-700 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-600 dark:border-blue-600">
+                  <span className="text-blue-700 dark:text-blue-300 dark:text-blue-300 font-medium">Selected: </span>
+                  <span className="text-blue-900 dark:text-blue-100 font-bold">
                     {activeDocument ? documents.find(d => d.id === activeDocument)?.name.substring(0, 20) + '...' : 'None'}
                   </span>
                 </div>
               </div>
             </div>
-            <div className="text-sm text-blue-700">
+            <div className="text-sm text-blue-700 dark:text-blue-300">
               Click tabs to switch departments and see different forms
             </div>
           </div>
@@ -813,46 +963,46 @@ export default function EnhancedDepartmentalLetters() {
           {/* Left Panel */}
           <div className="space-y-6">
             {/* Party Details */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-slate-200 dark:border-gray-700 dark:border-gray-700 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center">
                 <User className="h-5 w-5 mr-2 text-blue-600" />
                 Party Details
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-blue-600 mb-2">
+                  <label className="block text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">
                     Party Code:
                   </label>
                   <div className="flex gap-2">
                     <input
                       value={partyCode}
                       onChange={(e) => setPartyCode(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="e.g., 127"
                     />
-                    <button className="px-3 py-2 border border-slate-300 rounded-md bg-slate-50 hover:bg-slate-100 transition-colors">
+                    <button className="px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-slate-50 dark:bg-gray-700 hover:bg-slate-100 dark:hover:bg-gray-600 transition-colors">
                       ...
                     </button>
                   </div>
                 </div>
 
                 <div className="md:text-right">
-                  <label className="block text-sm font-medium text-blue-600 mb-2">
+                  <label className="block text-sm font-medium text-blue-600 dark:text-blue-400 mb-2">
                     Code:
                   </label>
                   <div className="flex md:justify-end gap-2">
                     <input
                       value={partyCode}
                       onChange={(e) => setPartyCode(e.target.value)}
-                      className="w-20 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-20 px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="127"
                     />
-                    <button className="px-3 py-2 border border-slate-300 rounded-md bg-slate-50 hover:bg-slate-100 transition-colors">
+                    <button className="px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-slate-50 dark:bg-gray-700 hover:bg-slate-100 dark:hover:bg-gray-600 transition-colors">
                       ...
                     </button>
                   </div>
-                  <div className="mt-3 text-sm font-medium text-blue-600">
+                  <div className="mt-3 text-sm font-medium text-blue-600 dark:text-blue-400">
                     CompuOffice Home
                   </div>
                 </div>
@@ -860,25 +1010,25 @@ export default function EnhancedDepartmentalLetters() {
 
               <div className="space-y-4">
                 <div>
-                  <span className="text-sm font-medium text-blue-600">
+                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                     Party Name:
                   </span>
                   <input
                     value={partyName}
                     onChange={(e) => setPartyName(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., Abha Gaur"
                   />
                 </div>
 
                 <div>
-                  <span className="text-sm font-medium text-blue-600">
+                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                     Address:
                   </span>
                   <textarea
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows={3}
                     placeholder="e.g., 35 Khurjey Wala Mohalla, Lashker, Gwalior, MADHYA PRADESH, INDIA, 474001"
                   />
@@ -886,25 +1036,25 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <span className="text-sm font-medium text-blue-600">
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                       Email:
                     </span>
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., example@gmail.com"
                     />
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-blue-600">
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                       GST Number:
                     </span>
                     <input
                       value={gstNumber}
                       onChange={(e) => setGstNumber(e.target.value)}
-                      className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., 07AABCU9603R1ZV"
                     />
                   </div>
@@ -912,37 +1062,37 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <span className="text-sm font-medium text-blue-600">
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                       Partner Name:
                     </span>
                     <input
                       value={partnerName}
                       onChange={(e) => setPartnerName(e.target.value)}
-                      className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., Raj Kumar Kushwah"
                     />
                   </div>
                   <div>
-                    <span className="text-sm font-medium text-blue-600">
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                       Firm Name:
                     </span>
                     <input
                       value={firmName}
                       onChange={(e) => setFirmName(e.target.value)}
-                      className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., Anshul Goods Carriers"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-sm font-medium text-blue-600">
+                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                     Place:
                   </span>
                   <input
                     value={place}
                     onChange={(e) => setPlace(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., Fatehpur"
                   />
                 </div>
@@ -951,13 +1101,13 @@ export default function EnhancedDepartmentalLetters() {
               <div className="mt-6 flex justify-end">
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-blue-600" />
-                  <label className="text-sm font-medium text-blue-600">
+                  <label className="text-sm font-medium text-blue-600 dark:text-blue-400">
                     Ass. Year:
                   </label>
                   <select
                     value={assYear}
                     onChange={(e) => setAssYear(e.target.value)}
-                    className="px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option>2026 - 2027</option>
                     <option>2025 - 2026</option>
@@ -968,13 +1118,13 @@ export default function EnhancedDepartmentalLetters() {
             </div>
 
             {/* Form Categories */}
-            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-slate-200 dark:border-gray-700 dark:border-gray-700 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
                 Form Categories
               </h2>
 
               {/* Category Tabs */}
-              <div className="border-b border-slate-200 mb-4">
+              <div className="border-b border-slate-200 dark:border-gray-700 dark:border-gray-700 mb-4">
                 <div className="flex flex-wrap gap-1">
                   {Object.keys(formCategories).map((category) => (
                     <button
@@ -982,12 +1132,12 @@ export default function EnhancedDepartmentalLetters() {
                       onClick={() => handleCategorySelect(category)}
                       className={`px-3 py-2 text-sm font-medium border-b-2 transition-all duration-200 ${
                         selectedCategory === category
-                          ? "border-blue-500 text-blue-600 bg-blue-50"
-                          : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                          ? "border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-900"
+                          : "border-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-white hover:border-slate-300 dark:border-gray-600"
                       }`}
                     >
                       <span>{category.replace(/_/g, " ")}</span>
-                      <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
                         {formCategories[category]?.length || 0}
                       </span>
                     </button>
@@ -997,38 +1147,38 @@ export default function EnhancedDepartmentalLetters() {
 
               {/* Forms List */}
               {selectedCategory && (
-                <div className="bg-slate-50 rounded-lg p-4">
+                <div className="bg-slate-50 dark:bg-gray-700 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium text-slate-700">
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       {selectedCategory.replace(/_/g, " ")} Forms - Click to Add to Documents List:
                     </h3>
                     <div className="flex items-center space-x-2 text-xs">
-                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                      <span className="bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
                         {formCategories[selectedCategory]?.length || 0} forms available
                       </span>
-                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
+                      <span className="bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 px-2 py-1 rounded">
                         {documents.filter(doc => doc.category === selectedCategory).length} created
                       </span>
                     </div>
                   </div>
-                  <div className="max-h-40 overflow-y-auto border border-slate-200 bg-white rounded">
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-gray-700 dark:border-gray-600 bg-white dark:bg-gray-700 rounded">
                     {formCategories[selectedCategory]?.map((form: string) => {
                       const isCreated = documents.some(doc => doc.name === form && doc.category === selectedCategory);
                       return (
                         <button
                           key={form}
                           onClick={() => handleFormSelect(form)}
-                          className="w-full px-3 py-2 text-left text-sm border-b border-slate-100 last:border-b-0 transition-colors hover:bg-blue-50 text-slate-600"
+                          className="w-full px-3 py-2 text-left text-sm border-b border-slate-100 dark:border-gray-600 last:border-b-0 transition-colors hover:bg-blue-50 dark:bg-blue-900 text-slate-600 dark:text-slate-300"
                         >
                           <div className="flex items-center justify-between">
-                            <span className={isCreated ? "text-green-700 font-medium" : ""}>
+                            <span className={isCreated ? "text-green-700 dark:text-green-300 font-medium" : ""}>
                               {form}
                               {isCreated && <span className="ml-2 text-xs text-green-600">✓</span>}
                             </span>
                             <span className={`text-xs px-2 py-1 rounded ${
                               isCreated 
-                                ? "bg-green-100 text-green-700" 
-                                : "bg-blue-100 text-blue-700"
+                                ? "bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300" 
+                                : "bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300"
                             }`}>
                               {isCreated ? "Created" : "Add to List"}
                             </span>
@@ -1037,7 +1187,7 @@ export default function EnhancedDepartmentalLetters() {
                       );
                     })}
                   </div>
-                  <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                  <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-600 rounded text-xs text-blue-700 dark:text-blue-300">
                     💡 Click any form above to add it to your Documents List. Green checkmarks show already created forms.
                   </div>
                 </div>
@@ -1046,16 +1196,16 @@ export default function EnhancedDepartmentalLetters() {
           </div>
 
           {/* Right Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-slate-200 dark:border-gray-700 dark:border-gray-700 overflow-hidden">
             <div className="bg-blue-600 text-white text-center py-4">
               <h2 className="text-lg font-bold">Documents List</h2>
             </div>
 
             {/* Document Selection Dropdown */}
             {documents.length > 0 && (
-              <div className="p-4 border-b border-slate-200">
+              <div className="p-4 border-b border-slate-200 dark:border-gray-700 dark:border-gray-700">
                 <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-slate-700">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Select Document to Work With:
                   </label>
                   <select
@@ -1069,7 +1219,7 @@ export default function EnhancedDepartmentalLetters() {
                         setSelectedDocuments([]);
                       }
                     }}
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="flex-1 px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="">-- Select a document --</option>
                     {documents.map((doc) => (
@@ -1100,8 +1250,8 @@ export default function EnhancedDepartmentalLetters() {
 
             {/* Document Table */}
             <div className="p-4">
-              <div className="border border-slate-200 rounded-md overflow-hidden">
-                <div className="bg-blue-50 grid grid-cols-9 gap-1 p-3 text-xs font-semibold text-slate-900 border-b border-slate-200">
+              <div className="border border-slate-200 dark:border-gray-700 dark:border-gray-600 rounded-md overflow-hidden">
+                <div className="bg-blue-50 dark:bg-blue-900 dark:bg-gray-700 grid grid-cols-9 gap-1 p-3 text-xs font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-gray-700 dark:border-gray-600">
                   <div>Select</div>
                   <div>Created on</div>
                   <div>Nature</div>
@@ -1115,8 +1265,8 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="max-h-60 overflow-y-auto">
                   {documents.length === 0 ? (
-                    <div className="h-40 bg-slate-50 flex items-center justify-center">
-                      <p className="text-slate-500 text-sm">
+                    <div className="h-40 bg-slate-50 dark:bg-gray-700 flex items-center justify-center">
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">
                         No documents available. Create documents by selecting from Form Categories.
                       </p>
                     </div>
@@ -1124,10 +1274,10 @@ export default function EnhancedDepartmentalLetters() {
                     documents.map((doc) => (
                       <div
                         key={doc.id}
-                        className={`grid grid-cols-9 gap-1 p-3 text-xs border-b border-slate-100 transition-colors ${
+                        className={`grid grid-cols-9 gap-1 p-3 text-xs border-b border-slate-100 dark:border-gray-600 transition-colors ${
                           activeDocument === doc.id 
-                            ? "bg-blue-100 border-blue-300" 
-                            : "hover:bg-slate-50"
+                            ? "bg-blue-100 dark:bg-blue-800 border-blue-300 dark:border-blue-600" 
+                            : "hover:bg-slate-50 dark:hover:bg-gray-600 dark:bg-gray-700"
                         }`}
                       >
                         <div className="flex items-center justify-center">
@@ -1159,7 +1309,7 @@ export default function EnhancedDepartmentalLetters() {
                         <div onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => handleDelete(doc.id)}
-                            className="text-red-600 hover:text-red-800"
+                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
                             title="Delete"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -1172,15 +1322,15 @@ export default function EnhancedDepartmentalLetters() {
               </div>
 
             {/* Bottom Controls */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50">
+            <div className="p-4 border-t border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-700">
               <div className="flex flex-wrap items-center gap-4 mb-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-700">Letters Creation Date:</span>
+                  <span className="text-slate-700 dark:text-slate-300">Letters Creation Date:</span>
                   <input
                     type="date"
                     value={creationDate}
                     onChange={(e) => setCreationDate(e.target.value)}
-                    className="px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-2 py-1 border border-slate-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button 
                     onClick={() => {
@@ -1208,12 +1358,12 @@ export default function EnhancedDepartmentalLetters() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-700">Letters Filing Date:</span>
+                  <span className="text-slate-700 dark:text-slate-300">Letters Filing Date:</span>
                   <input
                     type="date"
                     value={filedDate}
                     onChange={(e) => setFiledDate(e.target.value)}
-                    className="px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-2 py-1 border border-slate-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button 
                     onClick={() => {
@@ -1246,7 +1396,7 @@ export default function EnhancedDepartmentalLetters() {
                 </div>
               </div>
 
-              <h3 className="text-center font-bold text-slate-900 mb-4">
+              <h3 className="text-center font-bold text-slate-900 dark:text-white mb-4">
                 Letters
               </h3>
 
@@ -1255,8 +1405,8 @@ export default function EnhancedDepartmentalLetters() {
                   onClick={handleCreate}
                   className={`flex items-center justify-center px-3 py-2 border rounded transition-all duration-200 ${
                     activeDocument 
-                      ? "bg-green-100 border-green-300 hover:bg-green-200" 
-                      : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                      ? "bg-green-100 dark:bg-green-800 dark:bg-green-800 border-green-300 dark:border-green-600 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-700 dark:hover:bg-green-700 text-green-700 dark:text-green-300 dark:text-green-300" 
+                      : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   }`}
                   disabled={!activeDocument}
                 >
@@ -1267,8 +1417,8 @@ export default function EnhancedDepartmentalLetters() {
                   onClick={handlePrint}
                   className={`flex items-center justify-center px-3 py-2 border rounded transition-all duration-200 ${
                     activeDocument 
-                      ? "bg-blue-100 border-blue-300 hover:bg-blue-200" 
-                      : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                      ? "bg-blue-100 dark:bg-blue-800 border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-300" 
+                      : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   }`}
                   disabled={!activeDocument}
                 >
@@ -1279,8 +1429,8 @@ export default function EnhancedDepartmentalLetters() {
                   onClick={handlePreview}
                   className={`flex items-center justify-center px-3 py-2 border rounded transition-all duration-200 ${
                     activeDocument 
-                      ? "bg-purple-100 border-purple-300 hover:bg-purple-200" 
-                      : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                      ? "bg-purple-100 dark:bg-purple-800 border-purple-300 dark:border-purple-600 hover:bg-purple-200 dark:hover:bg-purple-700 text-purple-700 dark:text-purple-300" 
+                      : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   }`}
                   disabled={!activeDocument}
                 >
@@ -1291,8 +1441,8 @@ export default function EnhancedDepartmentalLetters() {
                   onClick={handleEdit}
                   className={`flex items-center justify-center px-3 py-2 border rounded transition-all duration-200 ${
                     activeDocument 
-                      ? "bg-orange-100 border-orange-300 hover:bg-orange-200" 
-                      : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                      ? "bg-orange-100 dark:bg-orange-800 border-orange-300 dark:border-orange-600 hover:bg-orange-200 dark:hover:bg-orange-700 text-orange-700 dark:text-orange-300" 
+                      : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   }`}
                   disabled={!activeDocument}
                 >
@@ -1302,8 +1452,8 @@ export default function EnhancedDepartmentalLetters() {
                 <button 
                   className={`px-3 py-2 border rounded transition-all duration-200 ${
                     activeDocument 
-                      ? "bg-red-100 border-red-300 hover:bg-red-200" 
-                      : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                      ? "bg-red-100 dark:bg-red-800 border-red-300 dark:border-red-600 hover:bg-red-200 dark:hover:bg-red-700 text-red-700 dark:text-red-300" 
+                      : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   }`}
                   disabled={!activeDocument}
                 >
@@ -1313,18 +1463,18 @@ export default function EnhancedDepartmentalLetters() {
                   onClick={handleSendMail}
                   className={`flex items-center justify-center px-3 py-2 border rounded transition-all duration-200 ${
                     activeDocument 
-                      ? "bg-green-100 border-green-300 hover:bg-green-200" 
-                      : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
+                      ? "bg-green-100 dark:bg-green-800 dark:bg-green-800 border-green-300 dark:border-green-600 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-700 dark:hover:bg-green-700 text-green-700 dark:text-green-300 dark:text-green-300" 
+                      : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   }`}
                   disabled={!activeDocument}
                 >
                   <Send className="h-3 w-3 mr-1" />
                   S. Send Mail
                 </button>
-                <button className="px-3 py-2 bg-slate-200 border border-slate-300 rounded hover:bg-slate-300 transition-all duration-200">
+                <button className="px-3 py-2 bg-slate-200 dark:bg-gray-600 border border-slate-300 dark:border-gray-600 rounded hover:bg-slate-300 dark:hover:bg-gray-500 text-slate-700 dark:text-slate-300 transition-all duration-200">
                   X. Exit
                 </button>
-                <button className="px-3 py-2 bg-slate-200 border border-slate-300 rounded hover:bg-slate-300 transition-all duration-200">
+                <button className="px-3 py-2 bg-slate-200 dark:bg-gray-600 border border-slate-300 dark:border-gray-600 rounded hover:bg-slate-300 dark:hover:bg-gray-500 text-slate-700 dark:text-slate-300 transition-all duration-200">
                   L. Login
                 </button>
               </div>
@@ -1351,26 +1501,39 @@ export default function EnhancedDepartmentalLetters() {
       </div>
 
       {/* Preview Modal */}
-      {showPreview && previewContent && (
+      {showPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-900">
-                {previewContent.title}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-gray-700 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {previewContent?.title || "Document Preview"}
               </h3>
               <button
                 onClick={() => setShowPreview(false)}
-                className="p-2 hover:bg-slate-100 rounded-md transition-colors"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-gray-600 rounded-md transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-8rem)]">
-              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                {previewContent.content}
-              </pre>
+              {previewContent && previewContent.content ? (
+                <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-900 dark:text-white">
+                  {previewContent.content}
+                </pre>
+              ) : (
+                <div className="bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-200 p-4 rounded-md">
+                  <p className="font-bold mb-2">No content available for this template.</p>
+                  <p>The template system was unable to generate content for the selected document.</p>
+                  <p className="mt-2">Debug information:</p>
+                  <ul className="list-disc pl-5 mt-1">
+                    <li>PreviewContent: {JSON.stringify(previewContent)}</li>
+                    <li>Selected form: {getActiveDocumentForm() || "None"}</li>
+                  </ul>
+                  <p className="mt-2">Please check the browser console for detailed errors.</p>
+                </div>
+              )}
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-slate-200">
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-200 dark:border-gray-700">
               <button
                 onClick={handlePrint}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -1380,7 +1543,7 @@ export default function EnhancedDepartmentalLetters() {
               </button>
               <button
                 onClick={() => setShowPreview(false)}
-                className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-300 dark:border-gray-600 rounded hover:bg-slate-50 dark:hover:bg-gray-600 dark:bg-gray-700 text-slate-700 dark:text-slate-300 transition-colors"
               >
                 Close
               </button>
@@ -1392,15 +1555,15 @@ export default function EnhancedDepartmentalLetters() {
       {/* Edit Form Modal */}
       {showEditForm && activeDocument && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-gray-700 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center">
                 <Edit className="h-5 w-5 mr-2" />
                 Edit Form: {documents.find(d => d.id === activeDocument)?.name}
               </h3>
               <button
                 onClick={() => setShowEditForm(false)}
-                className="p-2 hover:bg-slate-100 rounded-md transition-colors"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-gray-600 rounded-md transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1408,26 +1571,26 @@ export default function EnhancedDepartmentalLetters() {
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-12rem)]">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Party Name:
                   </label>
                   <input
                     type="text"
                     value={editFormData.partyName || partyName}
                     onChange={(e) => setEditFormData({...editFormData, partyName: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., Abha Gaur"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Address:
                   </label>
                   <textarea
                     value={editFormData.address || address}
                     onChange={(e) => setEditFormData({...editFormData, address: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows={3}
                     placeholder="e.g., 35 Khurjey Wala Mohalla, Lashker, Gwalior, MADHYA PRADESH, INDIA, 474001"
                   />
@@ -1435,26 +1598,26 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Email:
                     </label>
                     <input
                       type="email"
                       value={editFormData.email || email}
                       onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., example@gmail.com"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       GST Number:
                     </label>
                     <input
                       type="text"
                       value={editFormData.gstNumber || gstNumber}
                       onChange={(e) => setEditFormData({...editFormData, gstNumber: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., 07AABCU9603R1ZV"
                     />
                   </div>
@@ -1462,39 +1625,39 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Partner Name:
                     </label>
                     <input
                       type="text"
                       value={editFormData.partnerName || partnerName}
                       onChange={(e) => setEditFormData({...editFormData, partnerName: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., Raj Kumar Kushwah"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Firm Name:
                     </label>
                     <input
                       type="text"
                       value={editFormData.firmName || firmName}
                       onChange={(e) => setEditFormData({...editFormData, firmName: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., Anshul Goods Carriers"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Assessment Year:
                   </label>
                   <select
                     value={editFormData.assYear || assYear}
                     onChange={(e) => setEditFormData({...editFormData, assYear: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option>2026 - 2027</option>
                     <option>2025 - 2026</option>
@@ -1504,26 +1667,26 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       PAN Number:
                     </label>
                     <input
                       type="text"
                       value={editFormData.panNumber || panNumber}
                       onChange={(e) => setEditFormData({...editFormData, panNumber: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., ABCDE1234F"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Ward Number:
                     </label>
                     <input
                       type="text"
                       value={editFormData.wardNumber || wardNumber}
                       onChange={(e) => setEditFormData({...editFormData, wardNumber: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., Ward-1(1)"
                     />
                   </div>
@@ -1531,26 +1694,26 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Refund Amount:
                     </label>
                     <input
                       type="text"
                       value={editFormData.refundAmount || refundAmount}
                       onChange={(e) => setEditFormData({...editFormData, refundAmount: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., ₹50,000"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       TDS Amount:
                     </label>
                     <input
                       type="text"
                       value={editFormData.tdsAmount || tdsAmount}
                       onChange={(e) => setEditFormData({...editFormData, tdsAmount: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., ₹5,000"
                     />
                   </div>
@@ -1558,68 +1721,68 @@ export default function EnhancedDepartmentalLetters() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Bank Name:
                     </label>
                     <input
                       type="text"
                       value={editFormData.bankName || bankName}
                       onChange={(e) => setEditFormData({...editFormData, bankName: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., State Bank of India"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Account Number:
                     </label>
                     <input
                       type="text"
                       value={editFormData.accountNumber || accountNumber}
                       onChange={(e) => setEditFormData({...editFormData, accountNumber: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., 12345678901234"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       IFSC Code:
                     </label>
                     <input
                       type="text"
                       value={editFormData.ifscCode || ifscCode}
                       onChange={(e) => setEditFormData({...editFormData, ifscCode: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="e.g., SBIN0001234"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Place:
                   </label>
                   <input
                     type="text"
                     value={editFormData.place || place}
                     onChange={(e) => setEditFormData({...editFormData, place: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter place name"
                   />
                 </div>
 
-                <div className="border-t border-slate-200 pt-4">
+                <div className="border-t border-slate-200 dark:border-gray-700 pt-4">
                   <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-sm font-medium text-slate-700">Template Content</h4>
+                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">Template Content</h4>
                     <div className="flex gap-2">
                       {customTemplates[documents.find(d => d.id === activeDocument)?.name || ""] && (
-                        <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                        <span className="px-2 py-1 text-xs bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded">
                           Custom Template Active
                         </span>
                       )}
                       <button
                         onClick={() => setShowTemplateEditor(!showTemplateEditor)}
-                        className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                        className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
                       >
                         {showTemplateEditor ? 'Hide Editor' : 'Edit Template'}
                       </button>
@@ -1628,18 +1791,18 @@ export default function EnhancedDepartmentalLetters() {
                   
                   {showTemplateEditor && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Edit Template Content:
                       </label>
                       <textarea
                         value={editableTemplate}
                         onChange={(e) => setEditableTemplate(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                         rows={10}
                         placeholder="Edit your template content here..."
                       />
                       <div className="flex justify-between items-center mt-2">
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           Changes will be saved and persist for this form until reset.
                         </p>
                         {customTemplates[documents.find(d => d.id === activeDocument)?.name || ""] && (
@@ -1674,7 +1837,7 @@ export default function EnhancedDepartmentalLetters() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-slate-200">
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-200 dark:border-gray-700">
               <button
                 onClick={() => {
                   if (showTemplateEditor && editableTemplate) {
@@ -1701,7 +1864,7 @@ export default function EnhancedDepartmentalLetters() {
               </button>
               <button
                 onClick={() => setShowEditForm(false)}
-                className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-300 dark:border-gray-600 rounded hover:bg-slate-50 dark:hover:bg-gray-600 dark:bg-gray-700 text-slate-700 dark:text-slate-300 transition-colors"
               >
                 Cancel
               </button>
@@ -1713,15 +1876,15 @@ export default function EnhancedDepartmentalLetters() {
       {/* Multi-Email Dialog */}
       {showMultiEmailDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-gray-700 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center">
                 <Send className="h-5 w-5 mr-2" />
                 Send Multiple Forms
               </h3>
               <button
                 onClick={() => setShowMultiEmailDialog(false)}
-                className="p-2 hover:bg-slate-100 rounded-md transition-colors"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-gray-600 rounded-md transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1729,10 +1892,10 @@ export default function EnhancedDepartmentalLetters() {
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-12rem)]">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Select Forms to Send:
                   </label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-md p-3">
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 dark:border-gray-700 rounded-md p-3">
                     {documents.map((doc) => (
                       <label key={doc.id} className="flex items-center space-x-2">
                         <input
@@ -1747,11 +1910,11 @@ export default function EnhancedDepartmentalLetters() {
                           }}
                           className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 rounded"
                         />
-                        <span className="text-sm text-slate-700">{doc.name} ({doc.nature})</span>
+                        <span className="text-sm text-slate-700 dark:text-slate-300">{doc.name} ({doc.nature})</span>
                       </label>
                     ))}
                   </div>
-                  <div className="mt-2 flex justify-between text-xs text-slate-500">
+                  <div className="mt-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
                     <span>{selectedEmailDocuments.length} of {documents.length} selected</span>
                     <div className="space-x-2">
                       <button
@@ -1771,24 +1934,24 @@ export default function EnhancedDepartmentalLetters() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Email Address:
                   </label>
                   <input
                     type="email"
                     value={emailAddress}
                     onChange={(e) => setEmailAddress(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter recipient email address"
                   />
                 </div>
 
-                <div className="text-xs text-slate-500 bg-blue-50 p-3 rounded">
+                <div className="text-xs text-slate-500 dark:text-slate-400 bg-blue-50 dark:bg-blue-900 p-3 rounded">
                   📧 All selected forms will be combined into one email with clear separators between each form.
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-slate-200">
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-200 dark:border-gray-700">
               <button
                 onClick={handleMultiEmailSend}
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -1799,7 +1962,7 @@ export default function EnhancedDepartmentalLetters() {
               </button>
               <button
                 onClick={() => setShowMultiEmailDialog(false)}
-                className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-300 dark:border-gray-600 rounded hover:bg-slate-50 dark:hover:bg-gray-600 dark:bg-gray-700 text-slate-700 dark:text-slate-300 transition-colors"
               >
                 Cancel
               </button>
@@ -1811,15 +1974,15 @@ export default function EnhancedDepartmentalLetters() {
       {/* Email Dialog */}
       {showEmailDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-gray-700 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center">
                 <Send className="h-5 w-5 mr-2" />
                 Send Email
               </h3>
               <button
                 onClick={() => setShowEmailDialog(false)}
-                className="p-2 hover:bg-slate-100 rounded-md transition-colors"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-gray-600 rounded-md transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1827,33 +1990,33 @@ export default function EnhancedDepartmentalLetters() {
             <div className="p-6">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Form to Send:
                   </label>
-                  <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-gray-700 p-2 rounded">
                     {documents.find(d => d.id === activeDocument)?.name}
                   </p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Email Address:
                   </label>
                   <input
                     type="email"
                     value={emailAddress}
                     onChange={(e) => setEmailAddress(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter recipient email address"
                   />
                 </div>
 
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
                   Note: This will open your default email client with the form content pre-filled.
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-4 border-t border-slate-200">
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-200 dark:border-gray-700">
               <button
                 onClick={handleEmailSend}
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -1864,7 +2027,7 @@ export default function EnhancedDepartmentalLetters() {
               </button>
               <button
                 onClick={() => setShowEmailDialog(false)}
-                className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                className="px-4 py-2 border border-slate-300 dark:border-gray-600 rounded hover:bg-slate-50 dark:hover:bg-gray-600 dark:bg-gray-700 text-slate-700 dark:text-slate-300 transition-colors"
               >
                 Cancel
               </button>
@@ -1880,10 +2043,10 @@ export default function EnhancedDepartmentalLetters() {
             key={notification.id}
             className={`px-4 py-3 rounded-lg shadow-lg border-l-4 max-w-md transition-all duration-300 ${
               notification.type === 'success'
-                ? 'bg-green-50 border-green-400 text-green-800'
+                ? 'bg-green-50 dark:bg-green-900 border-green-400 dark:border-green-600 text-green-800 dark:text-green-200'
                 : notification.type === 'error'
-                ? 'bg-red-50 border-red-400 text-red-800'
-                : 'bg-blue-50 border-blue-400 text-blue-800'
+                ? 'bg-red-50 dark:bg-red-900 border-red-400 dark:border-red-600 text-red-800 dark:text-red-200'
+                : 'bg-blue-50 dark:bg-blue-900 border-blue-400 dark:border-blue-600 text-blue-800 dark:text-blue-200'
             }`}
           >
             <div className="flex items-center">

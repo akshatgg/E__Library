@@ -808,16 +808,16 @@ export function CaseLawsDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
       {/* Header */}
-      <header className="bg-white border-b shadow-sm">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 Case Law Database
               </h1>
-              <p className="text-gray-600 mt-1">
+              <p className="text-gray-600 dark:text-gray-300 mt-1">
                 Search and analyze legal precedents from multiple courts
               </p>
             </div>
@@ -833,24 +833,24 @@ export function CaseLawsDashboard() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
-            <Card key={index}>
+            <Card key={index} className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg dark:hover:shadow-gray-700/25 transition-all duration-200">
               <CardContent className="p-6">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
                     {stat.label}
                   </p>
                   <div className="flex items-center justify-between mt-2">
                     {statsLoading ? (
                       <>
-                        <Skeleton className="h-8 w-20" />
-                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-20 bg-gray-200 dark:bg-gray-700" />
+                        <Skeleton className="h-8 w-8 bg-gray-200 dark:bg-gray-700" />
                       </>
                     ) : (
                       <>
-                        <p className={`text-3xl font-bold ${stat.color}`}>
+                        <p className={`text-3xl font-bold ${stat.color} dark:brightness-110`}>
                           {stat.value}
                         </p>
-                        <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                        <stat.icon className={`h-8 w-8 ${stat.color} dark:brightness-110`} />
                       </>
                     )}
                   </div>
@@ -869,13 +869,13 @@ export function CaseLawsDashboard() {
 
           <TabsContent value="search" className="space-y-6">
             {/* Search Controls */}
-            <Card>
+            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm">
               <CardContent className="p-6">
                 <div className="space-y-4">
                   <div className="flex gap-4">
                     <div className="flex-1">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           placeholder="Search cases, sections, keywords..."
                           value={searchQuery}
@@ -883,7 +883,7 @@ export function CaseLawsDashboard() {
                           onKeyDown={(e) =>
                             e.key === "Enter" && searchCases(searchQuery)
                           }
-                          className="pl-10"
+                          className="pl-10 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-blue-500 dark:focus:border-blue-400"
                         />
                       </div>
                     </div>
@@ -1220,7 +1220,7 @@ export function CaseLawsDashboard() {
 
             {/* Search Results */}
             <div className="space-y-4">
-              <div className="space-y-1 text-sm text-gray-700">
+              <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
                 {selectedCategory === "all" ? (
                   <div className="flex justify-between">
                     <span>Found: {totalcasescount} cases</span>
@@ -1240,13 +1240,13 @@ export function CaseLawsDashboard() {
               {loading ? (
                 <div className="space-y-4">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <Card key={i}>
+                    <Card key={i} className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                       <CardContent className="p-6">
-                        <Skeleton className="h-6 w-3/4 mb-4" />
+                        <Skeleton className="h-6 w-3/4 mb-4 bg-gray-200 dark:bg-gray-700" />
                         <div className="flex gap-2 mb-4">
-                          <Skeleton className="h-5 w-20" />
-                          <Skeleton className="h-5 w-24" />
-                          <Skeleton className="h-5 w-16" />
+                          <Skeleton className="h-5 w-20 bg-gray-200 dark:bg-gray-700" />
+                          <Skeleton className="h-5 w-24 bg-gray-200 dark:bg-gray-700" />
+                          <Skeleton className="h-5 w-16 bg-gray-200 dark:bg-gray-700" />
                         </div>
                         <Skeleton className="h-20 w-full" />
                       </CardContent>
@@ -1254,30 +1254,30 @@ export function CaseLawsDashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="overflow-x-auto bg-white">
-                  <table className="w-full border-collapse border border-gray-300 bg-white">
+                <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="w-full border-collapse bg-white dark:bg-gray-800">
                     <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold w-8"></th>
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                      <tr className="bg-gray-50 dark:bg-gray-700">
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold w-8 text-gray-900 dark:text-white"></th>
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">
                           Case No.
                         </th>
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">
                           Case Title
                         </th>
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">
                           Court
                         </th>
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">
                           Bench
                         </th>
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">
                           Date
                         </th>
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">
                           Tags
                         </th>
-                        <th className="border border-gray-300 px-4 py-3 text-center font-semibold">
+                        <th className="border-b border-gray-200 dark:border-gray-600 px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">
                           Actions
                         </th>
                       </tr>
@@ -1289,14 +1289,14 @@ export function CaseLawsDashboard() {
                           Array.from({ length: 5 }).map((_, idx) => (
                             <tr
                               key={`loading-${idx}`}
-                              className="animate-pulse"
+                              className="animate-pulse border-b border-gray-200 dark:border-gray-600"
                             >
                               {Array.from({ length: 8 }).map((__, colIdx) => (
                                 <td
                                   key={colIdx}
-                                  className="border border-gray-300 px-4 py-3 h-12"
+                                  className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 h-12 last:border-r-0"
                                 >
-                                  <Skeleton className="h-4 w-full" />
+                                  <Skeleton className="h-4 w-full bg-gray-200 dark:bg-gray-700" />
                                 </td>
                               ))}
                             </tr>
@@ -1306,31 +1306,31 @@ export function CaseLawsDashboard() {
                             return (
                               <tr
                                 key={caseItem.id}
-                                className={`hover:bg-gray-50 cursor-pointer ${
-                                  isExpanded ? "bg-gray-50" : ""
+                                className={`hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-600 transition-colors ${
+                                  isExpanded ? "bg-gray-50 dark:bg-gray-700" : "bg-white dark:bg-gray-800"
                                 }`}
                                 onClick={() => toggleRow(caseItem.id)}
                               >
                                 {/* Expand/Collapse Button */}
-                                <td className="border border-gray-300 px-4 py-3 text-center align-top">
+                                <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 text-center align-top">
                                   {isExpanded ? (
-                                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                                    <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                   ) : (
-                                    <ChevronRight className="h-4 w-4 text-gray-500" />
+                                    <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                   )}
                                 </td>
 
                                 {/* Case No. */}
-                                <td className="border border-gray-300 px-4 py-3 align-top">
-                                  <div className="text-sm font-medium truncate">
+                                <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 align-top">
+                                  <div className="text-sm font-medium truncate text-gray-900 dark:text-white">
                                     {caseItem.caseNumber}
                                   </div>
                                 </td>
 
                                 {/* Case Title */}
-                                <td className="border border-gray-300 px-4 py-3 align-top max-w-xs">
+                                <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 align-top max-w-xs">
                                   <div
-                                    className={`font-bold text-sm ${
+                                    className={`font-bold text-sm text-gray-900 dark:text-white ${
                                       !isExpanded ? "truncate" : ""
                                     }`}
                                     title={caseItem.title}
@@ -1338,18 +1338,18 @@ export function CaseLawsDashboard() {
                                     {caseItem.title}
                                   </div>
                                   {isExpanded && (
-                                    <p className="text-sm text-gray-600 mt-2">
+                                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
                                       {caseItem.summary}
                                     </p>
                                   )}
                                 </td>
 
                                 {/* Court */}
-                                <td className="border border-gray-300 px-4 py-3 align-top max-w-32">
+                                <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 align-top max-w-32">
                                   <div className="flex items-center gap-1">
-                                    <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                    <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                     <span
-                                      className={`text-sm font-medium ${
+                                      className={`text-sm font-medium text-gray-900 dark:text-white ${
                                         !isExpanded ? "truncate" : ""
                                       }`}
                                       title={caseItem.court}
@@ -1360,9 +1360,9 @@ export function CaseLawsDashboard() {
                                 </td>
 
                                 {/* Bench */}
-                                <td className="border border-gray-300 px-4 py-3 align-top max-w-32">
+                                <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 align-top max-w-32">
                                   <div
-                                    className={`text-sm ${
+                                    className={`text-sm text-gray-900 dark:text-white ${
                                       !isExpanded ? "truncate" : ""
                                     }`}
                                     title={caseItem.bench}
@@ -1372,10 +1372,10 @@ export function CaseLawsDashboard() {
                                 </td>
 
                                 {/* Date */}
-                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 align-top">
                                   <div className="flex items-center gap-1">
-                                    <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                    <span className="text-sm whitespace-nowrap">
+                                    <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                    <span className="text-sm whitespace-nowrap text-gray-900 dark:text-white">
                                       {new Date(
                                         caseItem.date
                                       ).toLocaleDateString()}
@@ -1384,9 +1384,9 @@ export function CaseLawsDashboard() {
                                   {isExpanded && (
                                     <div className="mt-2">
                                       <Badge
-                                        className={getOutcomeColor(
+                                        className={`${getOutcomeColor(
                                           caseItem.outcome
-                                        )}
+                                        )} dark:brightness-110`}
                                       >
                                         {caseItem.outcome
                                           .replace("_", " ")
@@ -1397,12 +1397,12 @@ export function CaseLawsDashboard() {
                                 </td>
 
                                 {/* Tags */}
-                                <td className="border border-gray-300 px-4 py-3 align-top max-w-36">
+                                <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 align-top max-w-36">
                                   <div className="space-y-1">
                                     <Badge
                                       className={`${getCategoryColor(
                                         caseItem.category
-                                      )} text-xs`}
+                                      )} text-xs dark:brightness-110`}
                                     >
                                       {caseItem.category}
                                     </Badge>
@@ -1414,7 +1414,7 @@ export function CaseLawsDashboard() {
                                               <Badge
                                                 key={index}
                                                 variant="outline"
-                                                className="text-xs"
+                                                className="text-xs border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
                                               >
                                                 {keyword}
                                               </Badge>
@@ -1426,12 +1426,12 @@ export function CaseLawsDashboard() {
                                 </td>
 
                                 {/* Actions */}
-                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                <td className="px-4 py-3 align-top">
                                   <div className="flex flex-col gap-1">
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-8 px-2"
+                                      className="h-8 px-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                                       onClick={(e) => {
                                         e.stopPropagation(); // prevent row toggle
                                         router.push(
@@ -1449,7 +1449,7 @@ export function CaseLawsDashboard() {
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="h-8 px-2"
+                                            className="h-8 px-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               window.open(
@@ -1465,7 +1465,7 @@ export function CaseLawsDashboard() {
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          className="h-8 px-2"
+                                          className="h-8 px-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                                           onClick={(e) => e.stopPropagation()}
                                         >
                                           <Share2 className="h-4 w-4 mr-1" />
@@ -1491,11 +1491,11 @@ export function CaseLawsDashboard() {
                 ? Array.from({ length: 5 }).map((_, idx) => (
                     <Card
                       key={`skeleton-${idx}`}
-                      className="p-6 space-y-4 animate-pulse"
+                      className="p-6 space-y-4 animate-pulse bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                     >
-                      <div className="h-5 w-1/2 bg-gray-300 rounded" />
-                      <div className="h-8 w-1/3 bg-gray-300 rounded" />
-                      <div className="h-10 w-full bg-gray-200 rounded mt-2" />
+                      <div className="h-5 w-1/2 bg-gray-300 dark:bg-gray-600 rounded" />
+                      <div className="h-8 w-1/3 bg-gray-300 dark:bg-gray-600 rounded" />
+                      <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded mt-2" />
                     </Card>
                   ))
                 : [
@@ -1507,26 +1507,26 @@ export function CaseLawsDashboard() {
                   ].map((category) => (
                     <Card
                       key={category}
-                      className="hover:shadow-lg transition-shadow cursor-pointer"
+                      className="hover:shadow-lg dark:hover:shadow-gray-700/25 transition-shadow cursor-pointer bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                     >
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Gavel className="h-5 w-5" />
+                        <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                          <Gavel className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                           {category.replace("_", " ")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          <p className="text-2xl font-bold">
+                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
                             {categoryCounts[category] ?? 0}
                           </p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
                             Available cases
                           </p>
 
                           <Button
                             variant="outline"
-                            className="w-full"
+                            className="w-full border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                             onClick={() => {
                               // Set the selected category
                               setSelectedCategory(category);
@@ -1674,7 +1674,7 @@ export function CaseLawsDashboard() {
       </main>
 
       <div className="flex justify-between items-center mt-4 mb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 dark:text-gray-300">
           Showing page {currentPage} of {totalPages}
         </span>
 
@@ -1682,7 +1682,7 @@ export function CaseLawsDashboard() {
           {/* Previous Button */}
           <button
             onClick={handlePreviousPage}
-            className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-100"
+            className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
             disabled={currentPage === 1}
           >
             Previous
@@ -1693,14 +1693,14 @@ export function CaseLawsDashboard() {
             <>
               <button
                 onClick={() => handlePageChange(1)}
-                className="px-3 py-1 border rounded hover:bg-gray-100"
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
               >
                 1
               </button>
               
               {/* Ellipsis if needed */}
               {currentPage > 4 && (
-                <span className="px-2">...</span>
+                <span className="px-2 text-gray-500 dark:text-gray-400">...</span>
               )}
             </>
           )}
@@ -1726,10 +1726,10 @@ export function CaseLawsDashboard() {
                 <button
                   key={pageNum}
                   onClick={() => handlePageChange(pageNum)}
-                  className={`px-3 py-1 border rounded ${
+                  className={`px-3 py-1 border rounded transition-colors ${
                     pageNum === currentPage 
-                      ? "bg-blue-700 text-white font-semibold" 
-                      : "hover:bg-gray-100"
+                      ? "bg-blue-700 dark:bg-blue-600 text-white font-semibold border-blue-700 dark:border-blue-600" 
+                      : "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   {pageNum}
@@ -1743,11 +1743,11 @@ export function CaseLawsDashboard() {
           {currentPage < totalPages - 2 && (
             <>
               {currentPage < totalPages - 3 && (
-                <span className="px-2">...</span>
+                <span className="px-2 text-gray-500 dark:text-gray-400">...</span>
               )}
               <button
                 onClick={() => handlePageChange(totalPages)}
-                className="px-3 py-1 border rounded hover:bg-gray-100"
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
               >
                 {totalPages}
               </button>
@@ -1757,7 +1757,7 @@ export function CaseLawsDashboard() {
           {/* Next Button */}
           <button
             onClick={handleNextPage}
-            className={`px-3 py-1 border rounded hover:bg-gray-100 ${
+            className={`px-3 py-1 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors ${
               currentPage >= totalPages ? "opacity-50 cursor-not-allowed" : ""
             }`}
             disabled={currentPage >= totalPages}
