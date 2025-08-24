@@ -15,23 +15,31 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import {useAuth} from "@/components/auth-provider";
+import {jwtDecode} from "jwt-decode";
+import type {JwtPayload} from "jsonwebtoken";
 
 // Lazy load the Chatbot component
 const Chatbot = lazy(() => import("@/components/chatbot/index"));
 
 export default function HomePage() {
-  const {user, access_token, loading} = useAuth();
+  const {user, loading, isTokenValid} = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // Only redirect if authentication has been checked and user isn't authenticated
-    if (!access_token || !user) {
-      router.push("/auth/signin");
+    // Check authentication and token validity after loading completes
+    if (!loading) {
+      // Use the new isTokenValid utility
+      const tokenValid = isTokenValid();
+      
+      if (!tokenValid || !user) {
+        console.log("Authentication check failed - Token valid:", tokenValid, "User exists:", !!user);
+        router.push("/auth/signin");
+      }
     }
-  }, [user, router, access_token]);
+  }, [user, router, loading, isTokenValid]);
 
   // Show a smaller, more efficient loading indicator
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-600"></div>
@@ -39,9 +47,8 @@ export default function HomePage() {
     );
   }
 
-  if (!user || !access_token) {
-    return null;
-  }
+  // Don't return null, display the landing page even if not authenticated
+  // This prevents the blank page while auth is being checked
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">

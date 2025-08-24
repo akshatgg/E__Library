@@ -53,6 +53,7 @@ export type AuthContextType = {
   updateProfile: (data: { displayName?: string }) => Promise<boolean>;
   getTransactions: () => Promise<any[]>;
   refreshUser: () => Promise<User | null>; // ✅ return type matches setUser
+  isTokenValid: () => boolean; // Utility to check if current token is valid
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,14 +81,35 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 2, // 2 days as requested
     });
   }, []);
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
     const token = getCookie("token") as string | undefined;
-    if (!token) return null;
-    saveToken(token); // extend cookie
+    if (!token) {
+      console.log("No token found in cookies");
+      return null;
+    }
+    
+    // First, validate the token before continuing
+    try {
+      const decoded = jwtDecode<JwtPayload & Partial<User>>(token);
+      
+      // Check if token is expired
+      if (!decoded.exp || decoded.exp * 1000 < Date.now()) {
+        console.log("Token expired:", new Date(decoded.exp! * 1000));
+        removeCookies("token");
+        return null;
+      }
+      
+      // Token is valid, extend it
+      saveToken(token);
+    } catch (tokenError) {
+      console.error("Invalid token:", tokenError);
+      removeCookies("token");
+      return null;
+    }
 
     try {
       setLoading(true);
@@ -130,8 +152,26 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       // Fallback to token data
       const decoded = jwtDecode<JwtPayload & Partial<User>>(token); // ✅ allow optional properties
 
-      if (!decoded.exp || decoded.exp * 1000 < Date.now())
+      // Check token expiration with detailed logging
+      if (!decoded.exp) {
+        console.error("Token missing expiration");
+        throw new Error("Invalid token: missing expiration");
+      }
+      
+      const expiryTime = decoded.exp * 1000;
+      const currentTime = Date.now();
+      const timeRemaining = expiryTime - currentTime;
+      
+      // If token is expired or expires in less than 5 minutes
+      if (timeRemaining <= 0) {
+        console.error(`Token expired at ${new Date(expiryTime).toLocaleString()}, ${Math.abs(Math.round(timeRemaining/1000/60))} minutes ago`);
         throw new Error("Token expired");
+      }
+      
+      // Log warning if token expires soon (less than 30 minutes)
+      if (timeRemaining < 30 * 60 * 1000) {
+        console.warn(`Token expires soon: ${Math.round(timeRemaining/1000/60)} minutes remaining`);
+      }
 
       const userData = {
         id: decoded.id as string,
@@ -157,12 +197,40 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
 
   useEffect(() => {
     const fetchUser = async () => {
-      const userData = await refreshUser();
-      setUser(userData);
+      try {
+        const userData = await refreshUser();
+        
+        // If no user data is returned (token invalid/expired), clear auth state
+        if (!userData) {
+          // Clear any existing tokens and user data
+          removeCookies("token");
+          setAccess_token(null);
+          setUser(null);
+          
+          // Redirect to sign in page if we're not already there
+          if (window.location.pathname !== "/auth/signin") {
+            router.push("/auth/signin");
+          }
+        } else {
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error("Error during auth refresh:", error);
+        // Clear auth state on error
+        removeCookies("token");
+        setAccess_token(null);
+        setUser(null);
+        router.push("/auth/signin");
+      }
     };
 
     fetchUser();
-  }, [refreshUser]);
+    
+    // Setup periodic token validation (every 5 minutes)
+    const tokenValidator = setInterval(fetchUser, 5 * 60 * 1000);
+    
+    return () => clearInterval(tokenValidator);
+  }, [refreshUser, router]);
 
   const login = async (
     email: string,
@@ -209,17 +277,35 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   };
 
   const logout = async (id: string): Promise<void> => {
+    setLoading(true);
     try {
-      const res = (await AuthService.logout(id)) as ApiResponse<null>;
-      if (!res.success) {
-        setError(res.message || "Logout failed");
-        return;
+      // Try to call the logout API, but proceed with local logout even if it fails
+      try {
+        const res = (await AuthService.logout(id)) as ApiResponse<null>;
+        if (!res.success) {
+          console.warn("API logout returned error:", res.message);
+          // Continue with logout process anyway
+        }
+      } catch (apiError) {
+        console.error("API logout error:", apiError);
+        // Continue with logout process anyway
       }
+      
+      // Always clear local state regardless of API response
       setUser(null);
-      removeCookies("token");
+      setAccess_token(null);
+      
+      // Clear all auth cookies
+      removeCookies("token", { path: "/" });
+      
+      // Redirect to sign-in page
       router.push("/auth/signin");
     } catch (err) {
       console.error("Logout error:", err);
+      // Still attempt to clear cookies on error
+      removeCookies("token", { path: "/" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -358,6 +444,27 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       setLoading(false);
     }
   }, [user?.id, setError, setLoading]); // Add dependencies
+  
+  // Utility function to check if the token is valid
+  const isTokenValid = useCallback((): boolean => {
+    try {
+      const token = getCookie("token") as string | undefined;
+      if (!token) return false;
+      
+      const decoded = jwtDecode<JwtPayload>(token);
+      
+      // Check if token is expired
+      if (!decoded.exp || decoded.exp * 1000 < Date.now()) {
+        console.log("Token validation failed: Token expired");
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Token validation error:", error);
+      return false;
+    }
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -374,7 +481,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         resetPassword,
         updateProfile,
         getTransactions,
-        refreshUser, // ✅ added to context
+        refreshUser,
+        isTokenValid, // Added token validation utility
       }}
     >
       {children}
