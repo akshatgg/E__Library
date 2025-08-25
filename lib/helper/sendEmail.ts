@@ -30,6 +30,7 @@ type TemplateMap = {
   passwordReset: PasswordResetPayload;
   otpVerification: OtpVerificationPayload;
   deleteAccountVerification: deleteAccountVerificationPayload;
+  profileUpdateVerification: deleteAccountVerificationPayload;
 };
 
 // ---- Centralized templates ----
@@ -67,6 +68,16 @@ const templates: {
            <p>Your OTP code is: <strong>${otp}</strong></p>
            <p>This OTP will expire in ${expiryMinutes} minutes.</p>
            <p>If you did not request this, please ignore this email.</p>`,
+  }),
+
+  profileUpdateVerification: ({name, otp, expiryMinutes = 10}) => ({
+    subject: "Verify Profile Update - E-Library",
+    text: `Hello ${name},\nYou requested to update your E-Library profile.\nYour OTP code is: ${otp}. It expires in ${expiryMinutes} minutes.\nIf you did not request this, please ignore this email.`,
+    html: `<p>Hello ${name},</p>
+             <p>You requested to <strong>update your E-Library profile</strong>.</p>
+             <p>Your OTP code is: <strong>${otp}</strong></p>
+             <p>This OTP will expire in ${expiryMinutes} minutes.</p>
+             <p>If you did not request this, please ignore this email.</p>`,
   }),
 };
 
@@ -120,6 +131,18 @@ export const sendOtpDeleteAccountVerificationEmail = (
   expiryMinutes?: number
 ) =>
   sendEmail(to, "deleteAccountVerification", {
+    name,
+    otp,
+    expiryMinutes,
+  });
+
+export const sendOtpUpdateProfileVerificationEmail = (
+  to: string,
+  name: string,
+  otp: string,
+  expiryMinutes?: number
+) =>
+  sendEmail(to, "profileUpdateVerification", {
     name,
     otp,
     expiryMinutes,
