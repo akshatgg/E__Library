@@ -118,7 +118,6 @@ export default function AuthPage() {
   // --------------------- Handlers ---------------------
   const handleEmailSignIn = async (data: SignInForm) => {
     const res = await login(data.email, data.password);
-    console.log("res", res);
     if (!res.success && res.message?.includes("Account not verified")) {
       setShowOtp(true);
       setPrefillEmail(data.email);

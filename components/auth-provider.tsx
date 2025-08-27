@@ -19,7 +19,7 @@ export type User = {
   role: string;
   isVerified?: boolean;
   isActive?: boolean;
-  credits?: number;  // Changed from string to number
+  credits?: number; // Changed from string to number
   lastLoggedin: string;
 };
 
@@ -50,7 +50,11 @@ export type AuthContextType = {
     otp: string,
     password: string
   ) => Promise<boolean>;
-  updateProfile: (data: { displayName?: string }) => Promise<boolean>;
+  updateProfile: (data: {
+    email: string;
+    displayName: string;
+    role: string;
+  }) => Promise<ApiResponse>;
   getTransactions: () => Promise<any[]>;
   refreshUser: () => Promise<User | null>; // ✅ return type matches setUser
   isTokenValid: () => boolean; // Utility to check if current token is valid
@@ -93,18 +97,18 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       console.log("No token found in cookies");
       return null;
     }
-    
+
     // First, validate the token before continuing
     try {
       const decoded = jwtDecode<JwtPayload & Partial<User>>(token);
-      
+
       // Check if token is expired
       if (!decoded.exp || decoded.exp * 1000 < Date.now()) {
         console.log("Token expired:", new Date(decoded.exp! * 1000));
         removeCookies("token");
         return null;
       }
-      
+
       // Token is valid, extend it
       saveToken(token);
     } catch (tokenError) {
@@ -122,22 +126,28 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
           console.log("Refreshing user data for ID:", user.id);
           const response = await AuthService.getUser(user.id);
           console.log("User API response:", response);
-          
+
           if (response.success && response.data) {
             const userData = response.data as User;
-            console.log("Raw user data from API:", userData, "Credits type:", typeof userData.credits);
-            
+            console.log(
+              "Raw user data from API:",
+              userData,
+              "Credits type:",
+              typeof userData.credits
+            );
+
             // Ensure credits is stored as a number
             if (userData.credits !== undefined) {
-              userData.credits = typeof userData.credits === 'number' 
-                ? userData.credits 
-                : parseInt(String(userData.credits)) || 0;
+              userData.credits =
+                typeof userData.credits === "number"
+                  ? userData.credits
+                  : parseInt(String(userData.credits)) || 0;
               console.log("Processed credits value:", userData.credits);
             } else {
               console.log("Credits field is undefined in API response");
               userData.credits = 0;
             }
-            
+
             console.log("User data refreshed from server:", userData);
             setUser(userData);
             return userData;
@@ -148,7 +158,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
           console.log("No user ID available for refresh");
         }
       } catch (serverError) {
-        console.error("Failed to get user data from server, falling back to token:", serverError);
+        console.error(
+          "Failed to get user data from server, falling back to token:",
+          serverError
+        );
       }
 
       // Fallback to token data
@@ -159,20 +172,30 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         console.error("Token missing expiration");
         throw new Error("Invalid token: missing expiration");
       }
-      
+
       const expiryTime = decoded.exp * 1000;
       const currentTime = Date.now();
       const timeRemaining = expiryTime - currentTime;
-      
+
       // If token is expired or expires in less than 5 minutes
       if (timeRemaining <= 0) {
-        console.error(`Token expired at ${new Date(expiryTime).toLocaleString()}, ${Math.abs(Math.round(timeRemaining/1000/60))} minutes ago`);
+        console.error(
+          `Token expired at ${new Date(
+            expiryTime
+          ).toLocaleString()}, ${Math.abs(
+            Math.round(timeRemaining / 1000 / 60)
+          )} minutes ago`
+        );
         throw new Error("Token expired");
       }
-      
+
       // Log warning if token expires soon (less than 30 minutes)
       if (timeRemaining < 30 * 60 * 1000) {
-        console.warn(`Token expires soon: ${Math.round(timeRemaining/1000/60)} minutes remaining`);
+        console.warn(
+          `Token expires soon: ${Math.round(
+            timeRemaining / 1000 / 60
+          )} minutes remaining`
+        );
       }
 
       const userData = {
@@ -201,14 +224,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     const fetchUser = async () => {
       try {
         const userData = await refreshUser();
-        
+
         // If no user data is returned (token invalid/expired), clear auth state
         if (!userData) {
           // Clear any existing tokens and user data
           removeCookies("token");
           setAccess_token(null);
           setUser(null);
-          
+
           // Redirect to sign in page if we're not already there
           if (window.location.pathname !== "/auth/signin") {
             router.push("/auth/signin");
@@ -227,10 +250,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     };
 
     fetchUser();
-    
+
     // Setup periodic token validation (every 5 minutes)
     const tokenValidator = setInterval(fetchUser, 5 * 60 * 1000);
-    
+
     return () => clearInterval(tokenValidator);
   }, [refreshUser, router]);
 
@@ -292,20 +315,20 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         console.error("API logout error:", apiError);
         // Continue with logout process anyway
       }
-      
+
       // Always clear local state regardless of API response
       setUser(null);
       setAccess_token(null);
-      
+
       // Clear all auth cookies
-      removeCookies("token", { path: "/" });
-      
+      removeCookies("token", {path: "/"});
+
       // Redirect to sign-in page
       router.push("/auth/signin");
     } catch (err) {
       console.error("Logout error:", err);
       // Still attempt to clear cookies on error
-      removeCookies("token", { path: "/" });
+      removeCookies("token", {path: "/"});
     } finally {
       setLoading(false);
     }
@@ -385,7 +408,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     }
   };
 
-  const updateProfile = async (data: { displayName?: string }) => {
+  const updateProfile = async (data: {
+    email: string;
+    displayName: string;
+    role: string;
+  }) => {
     setError(null);
     if (!user?.id) {
       setError("User not authenticated");
@@ -398,24 +425,29 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         user.id,
         data
       )) as ApiResponse<User>;
-      
+
+      if (!res.success && res.message.includes("OTP")) {
+        setError(res.message || "OTP verification required");
+        return res;
+      }
+
       if (!res.success) {
         setError(res.message || "Profile update failed");
-        return false;
+        return res;
       }
-      
+
       // Update local user state with new data
       if (res.user) {
-        setUser(prevUser => ({
+        setUser((prevUser) => ({
           ...prevUser!,
-          ...res.user
+          ...res.user,
         }));
       }
-      
-      return true;
+
+      return res;
     } catch (err: any) {
       setError(err.message || "Profile update error");
-      return false;
+      return err;
     } finally {
       setLoading(false);
     }
@@ -431,12 +463,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     try {
       setLoading(true);
       const response = await AuthService.getTransactions(user.id);
-      
+
       if (!response.success) {
         setError(response.message || "Failed to fetch transactions");
         return [];
       }
-      
+
       return response.data ? (response.data as any[]) : [];
     } catch (err: any) {
       setError(err.message || "Error fetching transactions");
@@ -446,21 +478,21 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       setLoading(false);
     }
   }, [user?.id, setError, setLoading]); // Add dependencies
-  
+
   // Utility function to check if the token is valid
   const isTokenValid = useCallback((): boolean => {
     try {
       const token = getCookie("token") as string | undefined;
       if (!token) return false;
-      
+
       const decoded = jwtDecode<JwtPayload>(token);
-      
+
       // Check if token is expired
       if (!decoded.exp || decoded.exp * 1000 < Date.now()) {
         console.log("Token validation failed: Token expired");
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error("Token validation error:", error);
@@ -469,97 +501,121 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   }, []);
 
   // Credit management functions
-  const useCredits = useCallback(async (amount: number): Promise<void> => {
-    if (!user?.id) {
-      throw new Error("User not authenticated");
-    }
-
-    if (!user.credits || user.credits < amount) {
-      throw new Error(`Insufficient credits. You need ${amount} credits but have ${user.credits || 0}.`);
-    }
-
-    try {
-      // Update credits in the backend
-      const response = await AuthService.updateUser(user.id, {
-        credits: user.credits - amount
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || "Failed to update credits");
+  const useCredits = useCallback(
+    async (amount: number): Promise<void> => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
       }
 
-      // The response.data contains the actual response from the API
-      const apiData = response.data as any;
-
-      // Save the new token if provided
-      if (apiData?.token) {
-        saveToken(apiData.token);
+      if (!user.credits || user.credits < amount) {
+        throw new Error(
+          `Insufficient credits. You need ${amount} credits but have ${
+            user.credits || 0
+          }.`
+        );
       }
 
-      // Update local user state with the response data
-      if (apiData?.user) {
-        setUser(prevUser => prevUser ? {
-          ...prevUser,
-          ...apiData.user,
-          credits: apiData.user.credits
-        } : null);
-      } else {
-        // Fallback to manual update if user data not in response
-        setUser(prevUser => prevUser ? {
-          ...prevUser,
-          credits: (prevUser.credits || 0) - amount
-        } : null);
+      try {
+        // Update credits in the backend
+        const response = await AuthService.updateUser(user.id, {
+          credits: user.credits - amount,
+        });
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to update credits");
+        }
+
+        // The response.data contains the actual response from the API
+        const apiData = response.data as any;
+
+        // Save the new token if provided
+        if (apiData?.token) {
+          saveToken(apiData.token);
+        }
+
+        // Update local user state with the response data
+        if (apiData?.user) {
+          setUser((prevUser) =>
+            prevUser
+              ? {
+                  ...prevUser,
+                  ...apiData.user,
+                  credits: apiData.user.credits,
+                }
+              : null
+          );
+        } else {
+          // Fallback to manual update if user data not in response
+          setUser((prevUser) =>
+            prevUser
+              ? {
+                  ...prevUser,
+                  credits: (prevUser.credits || 0) - amount,
+                }
+              : null
+          );
+        }
+      } catch (error) {
+        console.error("Error using credits:", error);
+        throw error;
+      }
+    },
+    [user]
+  );
+
+  const addCredits = useCallback(
+    async (amount: number): Promise<void> => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
       }
 
-    } catch (error) {
-      console.error("Error using credits:", error);
-      throw error;
-    }
-  }, [user]);
+      try {
+        // Update credits in the backend
+        const response = await AuthService.updateUser(user.id, {
+          credits: (user.credits || 0) + amount,
+        });
 
-  const addCredits = useCallback(async (amount: number): Promise<void> => {
-    if (!user?.id) {
-      throw new Error("User not authenticated");
-    }
+        if (!response.success) {
+          throw new Error(response.message || "Failed to add credits");
+        }
 
-    try {
-      // Update credits in the backend
-      const response = await AuthService.updateUser(user.id, {
-        credits: (user.credits || 0) + amount
-      });
+        // The response.data contains the actual response from the API
+        const apiData = response.data as any;
 
-      if (!response.success) {
-        throw new Error(response.message || "Failed to add credits");
+        // Save the new token if provided
+        if (apiData?.token) {
+          saveToken(apiData.token);
+        }
+
+        // Update local user state with the response data
+        if (apiData?.user) {
+          setUser((prevUser) =>
+            prevUser
+              ? {
+                  ...prevUser,
+                  ...apiData.user,
+                  credits: apiData.user.credits,
+                }
+              : null
+          );
+        } else {
+          // Fallback to manual update if user data not in response
+          setUser((prevUser) =>
+            prevUser
+              ? {
+                  ...prevUser,
+                  credits: (prevUser.credits || 0) + amount,
+                }
+              : null
+          );
+        }
+      } catch (error) {
+        console.error("Error adding credits:", error);
+        throw error;
       }
-
-      // The response.data contains the actual response from the API
-      const apiData = response.data as any;
-
-      // Save the new token if provided
-      if (apiData?.token) {
-        saveToken(apiData.token);
-      }
-
-      // Update local user state with the response data
-      if (apiData?.user) {
-        setUser(prevUser => prevUser ? {
-          ...prevUser,
-          ...apiData.user,
-          credits: apiData.user.credits
-        } : null);
-      } else {
-        // Fallback to manual update if user data not in response
-        setUser(prevUser => prevUser ? {
-          ...prevUser,
-          credits: (prevUser.credits || 0) + amount
-        } : null);
-      }
-
-    } catch (error) {
-      console.error("Error adding credits:", error);
-      throw error;
-    }
-  }, [user]);
+    },
+    [user]
+  );
 
   return (
     <AuthContext.Provider

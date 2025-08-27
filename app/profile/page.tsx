@@ -1,130 +1,180 @@
-"use client"
+"use client";
 
-import { useAuth } from "@/components/auth-provider"
-import { CreditDisplay } from "@/components/credit-system/credit-display"
-import { TransactionDetailsDialog } from "@/components/transaction-details-dialog"
-import { EditProfileDialog } from "@/components/edit-profile-dialog"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { User, CreditCard, History, Settings, IndianRupee, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Eye } from "lucide-react"
-import { useRazorpay } from "@/hooks/use-razorpay"
-import { useTransactionHistory } from "@/hooks/use-transaction-history"
-import { useToast } from "@/hooks/use-toast"
+import {useAuth} from "@/components/auth-provider";
+import {CreditDisplay} from "@/components/credit-system/credit-display";
+import {TransactionDetailsDialog} from "@/components/transaction-details-dialog";
+import {EditProfileDialog} from "@/components/edit-profile-dialog";
+import {Button} from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {Badge} from "@/components/ui/badge";
+import {useRouter} from "next/navigation";
+import {useEffect, useState} from "react";
+import {
+  User,
+  CreditCard,
+  History,
+  Settings,
+  IndianRupee,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  RefreshCw,
+  Eye,
+} from "lucide-react";
+import {useRazorpay} from "@/hooks/use-razorpay";
+import {useTransactionHistory} from "@/hooks/use-transaction-history";
+import {useToast} from "@/hooks/use-toast";
+import {Input} from "@/components/ui/input";
 
 export default function ProfilePage() {
-  const { user, logout, refreshUser,access_token } = useAuth()
-  const router = useRouter()
-  const { makePayment, isLoading: isPaymentLoading } = useRazorpay()
-  const { transactions, loading: transactionsLoading, refetch } = useTransactionHistory()
-  const { toast } = useToast()
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
+  const {user, logout, refreshUser, access_token, updateProfile} = useAuth();
+  const router = useRouter();
+  const {makePayment, isLoading: isPaymentLoading} = useRazorpay();
+  const {
+    transactions,
+    loading: transactionsLoading,
+    refetch,
+  } = useTransactionHistory();
+  const {toast} = useToast();
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    displayName: user?.displayName || "",
+    email: user?.email || "",
+    role: user?.role || "",
+    lastLoggedin: user?.lastLoggedin || "",
+  });
 
   // Authentication check
   useEffect(() => {
-    if (!access_token) {
-      router.push("/auth/signin")
+    if (!access_token || !user) {
+      router.push("/auth/signin");
     }
-  }, [access_token, router])
-  
+  }, [access_token, user, router]);
+
   // Separate effect for data initialization - runs only once on mount
   useEffect(() => {
     // Don't attempt to load data if not authenticated
-    if (!access_token) return
-    
+    if (!access_token) return;
+
     // Refresh user data and transactions when the page loads
     const initializeData = async () => {
       try {
-        console.log("Initializing profile data...")
-        const userData = await refreshUser()
-        console.log("Profile - User data after refresh:", userData)
-        console.log("Profile - Current user state:", user)
-        
-        await refetch()
-        console.log("Initial data load complete")
+        const userData = await refreshUser();
+
+        await refetch();
       } catch (error) {
-        console.error("Failed to initialize profile data:", error)
+        console.error("Failed to initialize profile data:", error);
       }
-    }
-    
-    initializeData()
+    };
+
+    initializeData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty dependency array means it runs once on mount
+  }, []); // Empty dependency array means it runs once on mount
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({...formData, [e.target.name]: e.target.value});
+  };
+
+  const handleSave = async () => {
+    if (!isEditing) return;
+
+    const data = {
+      displayName: formData.displayName,
+      email: formData.email,
+      role: formData.role,
+    };
+
+    console.log("✅ Updated User Data:", data);
+    const success = await updateProfile(data);
+
+    if (!success) return;
+
+    refreshUser();
+    console.log("✅ Updated User Data:", formData);
+    setIsEditing(false);
+  };
 
   const handleCreditPurchase = async (credits: number, amount: number) => {
     try {
-      await makePayment({ 
-        credits, 
+      await makePayment({
+        credits,
         amount,
         onSuccess: async (transaction) => {
-          console.log("Payment success callback triggered:", transaction)
-          
+          console.log("Payment success callback triggered:", transaction);
+
           // Refetch transactions and refresh user data after successful payment
           try {
             // Add a small delay to allow backend processing to complete
-            await new Promise(resolve => setTimeout(resolve, 500))
-            
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
             // Refresh both in parallel
-            const [userData, _] = await Promise.all([
-              refreshUser(),
-              refetch()
-            ])
-            
-            console.log("Transaction history and user data refreshed:", 
-              userData ? `Credits: ${userData.credits}` : "No user data returned")
-            
+            const [userData, _] = await Promise.all([refreshUser(), refetch()]);
+
+            console.log(
+              "Transaction history and user data refreshed:",
+              userData
+                ? `Credits: ${userData.credits}`
+                : "No user data returned"
+            );
+
             // Show success toast
             toast({
               title: "Credits Added Successfully",
               description: `${credits} credits have been added to your account.`,
               variant: "default",
-            })
+            });
           } catch (refreshError) {
-            console.error("Error refreshing data:", refreshError)
+            console.error("Error refreshing data:", refreshError);
           }
-        }
-      })
+        },
+      });
     } catch (error) {
-      console.error("Payment error:", error)
+      console.error("Payment error:", error);
       toast({
         title: "Payment Error",
         description: "Failed to process payment. Please try again.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const handleTransactionClick = (transaction: any) => {
-    setSelectedTransaction(transaction)
-    setIsDialogOpen(true)
-  }
+    setSelectedTransaction(transaction);
+    setIsDialogOpen(true);
+  };
 
   if (!user) {
     return (
       <div className="container mx-auto py-8">
         <div className="text-center">
           <p>Please sign in to view your profile</p>
-          <Button onClick={() => router.push("/auth/signin")} className="mt-4">
+          <Button
+            onClick={() => router.push("/auth/signin")}
+            className="mt-4"
+          >
             Sign In
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   const handleSignOut = async () => {
-    await logout(user.id)
-    router.push("/auth/signin")
-  }
-
-  // Debug output
-  console.log("Profile render - User object:", user);
-  console.log("Credits value:", user?.credits, "Type:", typeof user?.credits);
+    await logout(user.id);
+    router.push("/auth/signin");
+  };
 
   return (
     <div className="container mx-auto py-8">
@@ -132,11 +182,13 @@ export default function ProfilePage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold">My Profile</h1>
-            <p className="text-muted-foreground">Manage your account and credits</p>
+            <p className="text-muted-foreground">
+              Manage your account and credits
+            </p>
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={async () => {
                 const userData = await refreshUser();
                 console.log("Manual refresh - User data:", userData);
@@ -149,7 +201,10 @@ export default function ProfilePage() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="outline" onClick={handleSignOut}>
+            <Button
+              variant="outline"
+              onClick={handleSignOut}
+            >
               Sign Out
             </Button>
           </div>
@@ -175,29 +230,87 @@ export default function ProfilePage() {
 
               <TabsContent value="profile">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Profile Information</CardTitle>
-                    <CardDescription>Your personal information</CardDescription>
+                  <CardHeader className="flex flex-row justify-between items-center">
+                    <div>
+                      <CardTitle>Profile Information</CardTitle>
+                      <CardDescription>
+                        Your personal information
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditing(!isEditing)}
+                      size="sm"
+                    >
+                      {isEditing ? "Cancel" : "Edit"}
+                    </Button>
                   </CardHeader>
+
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Name */}
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Name</p>
-                        <p>{user.displayName}</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Name
+                        </p>
+                        <Input
+                          name="displayName"
+                          value={formData.displayName}
+                          onChange={handleChange}
+                          disabled={!isEditing}
+                        />
                       </div>
+
+                      {/* Email */}
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Email</p>
-                        <p>{user.email}</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Email
+                        </p>
+                        <Input
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          disabled={true}
+                        />
                       </div>
+
+                      {/* Account Type */}
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Account Type</p>
-                        <p className="capitalize">{user.role}</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Account Type
+                        </p>
+                        <Input
+                          name="role"
+                          value={formData.role}
+                          onChange={handleChange}
+                          disabled={true}
+                        />
                       </div>
+
+                      {/* Last Login */}
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Last Login</p>
-                        <p>{user.lastLoggedin ? new Date(user.lastLoggedin).toLocaleString() : 'N/A'}</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Last Login
+                        </p>
+                        <Input
+                          name="lastLoggedin"
+                          value={
+                            formData.lastLoggedin
+                              ? new Date(formData.lastLoggedin).toLocaleString()
+                              : "N/A"
+                          }
+                          disabled
+                        />
                       </div>
                     </div>
+
+                    {/* Save Button */}
+                    {isEditing && (
+                      <div className="flex justify-end">
+                        <Button onClick={handleSave}>Save</Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -212,19 +325,31 @@ export default function ProfilePage() {
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Current Balance</p>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Current Balance
+                          </p>
                           <p className="text-3xl font-bold">
                             {(() => {
-                              console.log("Rendering credits value:", user.credits, "Type:", typeof user.credits);
-                              const creditsValue = typeof user.credits === 'number' 
-                                ? user.credits 
-                                : (user.credits ? parseInt(String(user.credits)) : 0);
+                              console.log(
+                                "Rendering credits value:",
+                                user.credits,
+                                "Type:",
+                                typeof user.credits
+                              );
+                              const creditsValue =
+                                typeof user.credits === "number"
+                                  ? user.credits
+                                  : user.credits
+                                  ? parseInt(String(user.credits))
+                                  : 0;
                               return `${creditsValue} credits`;
                             })()}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Credit Usage</p>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Credit Usage
+                          </p>
                           <div className="flex items-center gap-2">
                             <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
                             <span>Case Law Search: 1 credit</span>
@@ -241,8 +366,8 @@ export default function ProfilePage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="h-auto py-4 flex flex-col hover:border-blue-500 transition-colors"
                           onClick={() => handleCreditPurchase(50, 499)}
                           disabled={isPaymentLoading}
@@ -252,15 +377,18 @@ export default function ProfilePage() {
                           ) : (
                             <>
                               <span className="text-2xl font-bold">50</span>
-                              <span className="text-sm text-muted-foreground">credits</span>
+                              <span className="text-sm text-muted-foreground">
+                                credits
+                              </span>
                               <span className="mt-2 font-medium flex items-center">
-                                <IndianRupee className="h-4 w-4" />499
+                                <IndianRupee className="h-4 w-4" />
+                                499
                               </span>
                             </>
                           )}
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="h-auto py-4 flex flex-col border-2 border-blue-500 hover:border-blue-600 transition-colors"
                           onClick={() => handleCreditPurchase(100, 899)}
                           disabled={isPaymentLoading}
@@ -270,16 +398,21 @@ export default function ProfilePage() {
                           ) : (
                             <>
                               <span className="text-2xl font-bold">100</span>
-                              <span className="text-sm text-muted-foreground">credits</span>
-                              <span className="mt-2 font-medium flex items-center">
-                                <IndianRupee className="h-4 w-4" />899
+                              <span className="text-sm text-muted-foreground">
+                                credits
                               </span>
-                              <span className="text-xs text-blue-500 mt-1">Best Value</span>
+                              <span className="mt-2 font-medium flex items-center">
+                                <IndianRupee className="h-4 w-4" />
+                                899
+                              </span>
+                              <span className="text-xs text-blue-500 mt-1">
+                                Best Value
+                              </span>
                             </>
                           )}
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="h-auto py-4 flex flex-col hover:border-blue-500 transition-colors"
                           onClick={() => handleCreditPurchase(200, 1699)}
                           disabled={isPaymentLoading}
@@ -289,9 +422,12 @@ export default function ProfilePage() {
                           ) : (
                             <>
                               <span className="text-2xl font-bold">200</span>
-                              <span className="text-sm text-muted-foreground">credits</span>
+                              <span className="text-sm text-muted-foreground">
+                                credits
+                              </span>
                               <span className="mt-2 font-medium flex items-center">
-                                <IndianRupee className="h-4 w-4" />1699
+                                <IndianRupee className="h-4 w-4" />
+                                1699
                               </span>
                             </>
                           )}
@@ -308,7 +444,9 @@ export default function ProfilePage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>Transaction History</CardTitle>
-                        <CardDescription>Your credit purchase and usage history</CardDescription>
+                        <CardDescription>
+                          Your credit purchase and usage history
+                        </CardDescription>
                       </div>
                       <Button
                         variant="outline"
@@ -316,7 +454,11 @@ export default function ProfilePage() {
                         onClick={refetch}
                         disabled={transactionsLoading}
                       >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${transactionsLoading ? 'animate-spin' : ''}`} />
+                        <RefreshCw
+                          className={`h-4 w-4 mr-2 ${
+                            transactionsLoading ? "animate-spin" : ""
+                          }`}
+                        />
                         Refresh
                       </Button>
                     </div>
@@ -330,7 +472,9 @@ export default function ProfilePage() {
                     ) : transactions.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>No transaction history available yet</p>
-                        <p className="text-sm mt-2">Purchase credits to see your transaction history here</p>
+                        <p className="text-sm mt-2">
+                          Purchase credits to see your transaction history here
+                        </p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -355,7 +499,9 @@ export default function ProfilePage() {
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex items-center space-x-2 mb-1">
-                                    <h4 className="font-medium text-sm">{transaction.description}</h4>
+                                    <h4 className="font-medium text-sm">
+                                      {transaction.description}
+                                    </h4>
                                     <Badge
                                       variant={
                                         transaction.status === "success"
@@ -370,24 +516,35 @@ export default function ProfilePage() {
                                     </Badge>
                                   </div>
                                   <p className="text-xs text-muted-foreground">
-                                    {new Date(transaction.timestamp).toLocaleDateString()} at{" "}
-                                    {new Date(transaction.timestamp).toLocaleTimeString([], { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
+                                    {new Date(
+                                      transaction.timestamp
+                                    ).toLocaleDateString()}{" "}
+                                    at{" "}
+                                    {new Date(
+                                      transaction.timestamp
+                                    ).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
                                     })}
                                   </p>
                                 </div>
                               </div>
-                              
+
                               <div className="flex items-center space-x-3">
                                 <div className="text-right">
                                   <div className="flex items-center space-x-1">
-                                    <span className="text-sm font-semibold text-green-600">+{transaction.credits}</span>
-                                    <span className="text-xs text-muted-foreground">credits</span>
+                                    <span className="text-sm font-semibold text-green-600">
+                                      +{transaction.credits}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      credits
+                                    </span>
                                   </div>
                                   <div className="flex items-center justify-end space-x-1">
                                     <IndianRupee className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-sm font-medium">{transaction.amount}</span>
+                                    <span className="text-sm font-medium">
+                                      {transaction.amount}
+                                    </span>
                                   </div>
                                 </div>
                                 <Eye className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -411,15 +568,26 @@ export default function ProfilePage() {
                 <CardTitle className="text-lg">Account Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline" className="w-full justify-start" onClick={() => setIsEditProfileOpen(true)}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => setIsEditProfileOpen(true)}
+                >
                   <Settings className="mr-2 h-4 w-4" />
                   Edit Profile
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                >
                   <CreditCard className="mr-2 h-4 w-4" />
                   Payment Methods
                 </Button>
-                <Button variant="outline" className="w-full justify-start" onClick={handleSignOut}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={handleSignOut}
+                >
                   Sign Out
                 </Button>
               </CardContent>
@@ -441,5 +609,5 @@ export default function ProfilePage() {
         onOpenChange={setIsEditProfileOpen}
       />
     </div>
-  )
+  );
 }
