@@ -117,6 +117,42 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const handleDownloadJudgmentPDF = async () => {
   if (!caseData) return;
 
+  // Check if user has enough credits for PDF download (5 credits)
+  if (!hasEnoughCredits(5)) {
+    toast({
+      title: "Insufficient Credits",
+      description: "You need 5 credits to download PDF. Please add more credits.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  // Deduct credits for PDF download
+  try {
+    const success = await spendCredits(5, `PDF Download: ${caseData.data.title}`);
+    if (!success) {
+      toast({
+        title: "Payment Failed",
+        description: "Failed to process credit deduction for PDF download.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: "Credits Deducted",
+      description: "5 credits deducted for PDF download",
+    });
+  } catch (error) {
+    console.error('Error spending credits for PDF download:', error);
+    toast({
+      title: "Error",
+      description: "Failed to process credit deduction",
+      variant: "destructive",
+    });
+    return;
+  }
+
   // Prepare the document for better PDF formatting
   const prepareDocumentForPDF = (htmlContent: string) => {
     // First extract the important text using our HTML stripper
@@ -277,15 +313,26 @@ export default function CasePage({ params }: { params: { tid: string } }) {
       
       try {
         setLoading(true);
+        setError(null);
+        console.log("Fetching case with TID:", tid);
         const result = await getCaseDetail(tid);
+        console.log("Case detail result:", result);
         if (result.success) {
           setCaseData(result);
         } else {
-          throw new Error(result.error);
+          throw new Error(result.error || "Case not found or failed to load");
         }
       } catch (error) {
         console.error("Error fetching case data:", error);
-        setError(error instanceof Error ? error.message : "Failed to load case data");
+        const errorMessage = error instanceof Error ? error.message : "Failed to load case data";
+        setError(errorMessage);
+        
+        // Also show a toast notification for better user experience
+        toast({
+          title: "Error Loading Case",
+          description: errorMessage,
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -406,12 +453,30 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   if (error || !caseData?.success) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
-        <div className="text-center">
+        <div className="text-center max-w-md mx-auto px-4">
           <div className="text-red-600 dark:text-red-400 text-6xl mb-4">⚠</div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Error Loading Case
+            Case Not Found
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">{error || "Case data not found"}</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {error || "The requested case could not be found or failed to load"}
+          </p>
+          <div className="space-y-3">
+            <Button 
+              onClick={() => router.back()}
+              variant="outline"
+              className="w-full"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Go Back
+            </Button>
+            <Button 
+              onClick={() => router.push("/case-laws")}
+              className="w-full"
+            >
+              Browse All Cases
+            </Button>
+          </div>
         </div>
       </div>
     );
