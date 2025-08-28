@@ -28,7 +28,7 @@ export function useCreditService() {
 
   const hasEnoughCredits = useCallback(
     (amount: number) => {
-      if (!user) return false
+      if (!user || user.credits === undefined) return false
       return user.credits >= amount
     },
     [user],
@@ -43,7 +43,7 @@ export function useCreditService() {
         return false
       }
 
-      if (user.credits < amount) {
+      if (user.credits === undefined || user.credits < amount) {
         setError(`Insufficient credits. You need ${amount} credits but have ${user.credits}.`)
         return false
       }
