@@ -3,10 +3,12 @@ import nodemailer from "nodemailer";
 
 // ✅ Create reusable transporter
 const transporter = nodemailer.createTransport({
-  service: process.env.NODEMAILER_SERVICE || "Gmail",
+  host: process.env.NODEMAILER_SMTP_HOST,   // e.g. smtp.hostinger.com
+  port: Number(process.env.NODEMAILER_SMTP_PORT) || 465,
+  secure: true, // true if you use 465
   auth: {
-    user: process.env.NODEMAILER_SMTP_EMAIL,
-    pass: process.env.NODEMAILER_SMTP_PASS,
+    user: process.env.NODEMAILER_SMTP_EMAIL, // full mailbox
+    pass: process.env.NODEMAILER_SMTP_PASS,  // mailbox password
   },
 });
 
