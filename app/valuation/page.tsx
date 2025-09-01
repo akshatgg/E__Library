@@ -1,5 +1,5 @@
-import { ValuationDashboard } from "@/components/dashboards/valuation-dashboard"
+import { CharteredEngineerDashboard } from "@/components/dashboards/chartered-engineer-dashboard";
 
 export default function ValuationPage() {
-  return <ValuationDashboard />
+  return <CharteredEngineerDashboard />
 }
