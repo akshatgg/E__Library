@@ -106,16 +106,55 @@ export function CharteredEngineerDashboard() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      // Here would be the API call in a real application
-      setFormSubmitted(true);
-      toast({
-        title: "Form submitted successfully!",
-        description: "We'll contact you shortly regarding your service request.",
-      });
-      setFormData(initialFormData);
+      try {
+        // Send form data to API
+        const response = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            subject: "Chartered Engineer Service Request: " + formData.serviceNeeded,
+            category: "Chartered Engineer",
+            message: `Service Requested: ${formData.serviceNeeded}\n\n${formData.message || "No additional message provided."}`,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          setFormSubmitted(true);
+          toast({
+            title: "Email sent successfully! ✅",
+            description: "Your request has been emailed to our team. We'll contact you shortly.",
+            variant: "default",
+            className: "bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800",
+          });
+          setFormData(initialFormData);
+          
+          // Reset form after showing success for 5 seconds
+          setTimeout(() => {
+            setFormSubmitted(false);
+          }, 5000);
+        } else {
+          toast({
+            title: "Email sending failed",
+            description: result.message || "An error occurred. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error submitting form:", error);
+        toast({
+          title: "Email sending failed",
+          description: "An unexpected error occurred. Please try again later.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -289,17 +328,35 @@ export function CharteredEngineerDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name" className="text-gray-700 dark:text-gray-300">Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => updateFormField('name', e.target.value)}
-                    className="mt-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
+              {formSubmitted ? (
+                <div className="py-8 text-center">
+                  <div className="mx-auto w-16 h-16 mb-4 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                    <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-green-600 dark:text-green-400 mb-2">Email Sent Successfully!</h3>
+                  <p className="text-gray-700 dark:text-gray-300 mb-6">
+                    Your request has been emailed to our team at info@itaxeasy.com.<br />
+                    We'll get back to you soon regarding your certification needs.
+                  </p>
+                  <Button 
+                    onClick={() => setFormSubmitted(false)}
+                    className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
+                  >
+                    Submit Another Request
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="name" className="text-gray-700 dark:text-gray-300">Name</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => updateFormField('name', e.target.value)}
+                      className="mt-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
                   {formErrors.name && (
                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.name}</p>
                   )}
@@ -370,6 +427,7 @@ export function CharteredEngineerDashboard() {
                   Request a Certification
                 </Button>
               </form>
+              )}
             </CardContent>
           </Card>
 

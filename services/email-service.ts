@@ -23,16 +23,18 @@ export default class EmailService {
   static async initialize() {
     if (EmailService.transporter != null) return
 
-    const user = process.env.OTP_EMAIL
-    const pass = process.env.OTP_PASS
+    const user = process.env.NODEMAILER_SMTP_EMAIL
+    const pass = process.env.NODEMAILER_SMTP_PASS
+    const host = process.env.NODEMAILER_SMTP_HOST
+    const port = Number(process.env.NODEMAILER_SMTP_PORT) || 465
 
-    if (!user || !pass) {
+    if (!user || !pass || !host) {
       throw new Error('Missing SMTP credentials in environment variables')
     }
 
     const transporter = nodemailer.createTransport({
-      host: 'smtpout.secureserver.net',
-      port: 465,
+      host: host,
+      port: port,
       secure: true,
       auth: {
         user,
@@ -74,8 +76,8 @@ export default class EmailService {
 
         Name: ${name}
         Email: ${email}
-        Phone: ${phone}
-        Category: ${category}
+        Phone: ${phone || 'Not provided'}
+        Category: ${category || 'Not selected'}
         Subject: ${subject}
 
         Message:
@@ -83,10 +85,11 @@ export default class EmailService {
       `
 
       const mailOptions: SendMailOptions = {
-        from: `"${name}" <${process.env.OTP_EMAIL}>`, // still use your SMTP email but show user's name
-        to: 'support@itaxeasy.com', // support email
+        from: `"${name}" <${process.env.NODEMAILER_SMTP_EMAIL}>`, // use SMTP email but show user's name
+        to: 'info@itaxeasy.com', // support email
         subject: `Contact Form: ${subject}`,
         text: emailContent,
+        
         replyTo: email, // allows support to reply directly to user's email
       }
 
