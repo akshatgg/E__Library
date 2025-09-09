@@ -1,6 +1,7 @@
 // src/chatbot/index.js
 "use client"
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import useGeminiAPI from './hooks/useGeminiAPI';
 import ChatIcon from './components/ChatIcon';
 // Only import the API hook when the chat is actually opened
 import './styles/chatbot.css';
@@ -13,8 +14,8 @@ const Chatbot = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState([]);
   const chatRef = useRef(null);
-  // Only initialize the API when the chat is opened
-  const [apiHook, setApiHook] = useState(null);
+  // Use Gemini API hook for sending messages
+  const { sendMessageToGemini, loading, error } = useGeminiAPI();
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -39,8 +40,8 @@ const Chatbot = () => {
     setMessages((prev) => [...prev, userMessage]);
     
     try {
-      // Get response from Gemini API
-      const response = await sendMessageToGemini(message);
+  // Get response from Gemini API
+  const response = await sendMessageToGemini(message);
       
       const botMessage = {
         id: Date.now() + 1,
