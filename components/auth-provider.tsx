@@ -82,12 +82,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
 
   const saveToken = useCallback((token: string) => {
     setAccess_token(token);
+    // Client-side cannot set httpOnly cookies, server already sets the token cookie
+    // We only set httpOnly: false here for client-side token access
     setCookies("token", token, {
-      httpOnly: process.env.NODE_ENV === "production",
+      httpOnly: false, // Client needs to read this
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24 * 2, // 2 days as requested
+      maxAge: 60 * 60 * 24 * 7, // 7 days to match server setting
     });
   }, []);
 

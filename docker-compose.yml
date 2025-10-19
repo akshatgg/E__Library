@@ -1,0 +1,91 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: elibrary_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Akshat@1234
+      POSTGRES_DB: e_lib
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - elibrary_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: elibrary_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4500:4500"
+    networks:
+      - elibrary_network
+    environment:
+      NODE_ENV: production
+      PORT: 4500
+      # Database Configuration
+      DATABASE_URL: "postgresql://postgres:Akshat%401234@postgres:5432/e_lib"
+      # Firebase Config
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}
+      # Razorpay Configuration
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      NEXT_PUBLIC_RAZORPAY_KEY_ID: ${NEXT_PUBLIC_RAZORPAY_KEY_ID}
+      # App Config - Use empty string for Docker to use relative URLs
+      NEXT_PUBLIC_API_URL: ""
+      # Email OTP
+      OPT_EMAIL: ${OPT_EMAIL}
+      OTP_PASS: ${OTP_PASS}
+      # Cron Jobs
+      ENABLE_CRON_JOBS: ${ENABLE_CRON_JOBS:-true}
+      CRON_SECRET: ${CRON_SECRET}
+      # Indian Kanoon API
+      NEXT_PUBLIC_KANOON_TOKEN: ${NEXT_PUBLIC_KANOON_TOKEN}
+      NEXT_PUBLIC_KANOON_URL: ${NEXT_PUBLIC_KANOON_URL}
+    command: sh -c "npx prisma generate && npx prisma db push --accept-data-loss && npm start"
+
+  # PgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: elibrary_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@elibrary.com
+      PGADMIN_DEFAULT_PASSWORD: admin@1234
+      PGADMIN_LISTEN_PORT: 5050
+    ports:
+      - "5050:5050"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - elibrary_network
+    depends_on:
+      - postgres
+
+networks:
+  elibrary_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  pgadmin_data:

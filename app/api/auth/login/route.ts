@@ -114,11 +114,11 @@ export async function POST(req: NextRequest) {
     );
 
     res.cookies.set("token", token, {
-      httpOnly: process.env.NODE_ENV === "production", // prevent JS access
+      httpOnly: false, // Allow client-side access for auth state management
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7, // expire immediately
+      maxAge: 60 * 60 * 24 * 7, // 7 days
     });
 
     return res;

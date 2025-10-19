@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, {params}: {params: {id: string}}) {
     );
 
     res.cookies.set("token", "", {
-      httpOnly: process.env.NODE_ENV === "production", // prevent JS access
+      httpOnly: false, // Allow client-side access for auth state management
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
@@ -168,7 +168,7 @@ export async function PATCH(
     );
 
     res.cookies.set("token", `${token}`, {
-      httpOnly: process.env.NODE_ENV === "production", // prevent JS access
+      httpOnly: false, // Allow client-side access for auth state management
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",

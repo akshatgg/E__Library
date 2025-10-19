@@ -16,6 +16,8 @@ const nextConfig = {
     // Stale-while-revalidate to help with hydration
     styledComponents: true,
   },
+  // Enable standalone output for Docker
+  output: 'standalone',
 }
 
 export default nextConfig
